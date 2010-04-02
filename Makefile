@@ -1,6 +1,8 @@
 CC=gcc
 
-all: klamrisk klamrisk-win32.exe
+all: klamrisk
+
+both: klamrisk klamrisk-win32.exe
 
 klamrisk-win32.exe: klamrisk.c
 	i686-mingw32-gcc $^ -lmingw32 -lSDLmain -lSDL -o $@ 
