@@ -33,6 +33,7 @@ char circlebuf[CIRCLEMAX][CIRCLEMAX];
 struct particle {
 	int	x, y;
 	int	dx, dy;
+	int	ddy;
 	int	r;
 } particle[NPARTICLE];
  
@@ -71,8 +72,9 @@ static void splatter(int x, int y) {
 		particle[i].x = x * 8;
 		particle[i].y = y * 8;
 		particle[i].dx = (rand() % 64) - 32;
-		particle[i].dy = (rand() % 64) - 32;
+		particle[i].dy = (rand() % 64) - 48;
 		particle[i].r = rand() % (CIRCLEMAX / 2);
+		particle[i].ddy = 2;
 	}
 }
 
@@ -99,7 +101,7 @@ static void draw_circle(int xpos, int ypos, int r) {
 	for(y = -r; y < r; y++) {
 		if(ypos + y >= 0 && ypos + y < SCREEN_HEIGHT) {
 			for(x = -r; x < r; x++) {
-				if(xpos + x >= shaft.x && xpos + x < shaft.x + shaft.w) {
+				if(xpos + x >= LEFTSIDE && xpos + x < RIGHTSIDE) {
 					if(circlebuf[y + CIRCLEMAX/2][x + CIRCLEMAX/2] < r) {
 						uint8_t *pix = (uint8_t *) screen->pixels + screen->pitch * (ypos + y) + 3 * (xpos + x);
 						pix[0] = 0x00;
@@ -164,7 +166,7 @@ int main(int argc, char *argv[])
 							}
 							break;
 						case SDLK_x:
-							splatter(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+							splatter(SCREEN_WIDTH / 2 - 10, SCREEN_HEIGHT / 2);
 							break;
 						case SDLK_ESCAPE:
 							running = 0;
@@ -204,16 +206,27 @@ int main(int argc, char *argv[])
 			if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
 				draw_circle(particle[i].x / 8, particle[i].y / 8, particle[i].r);
 				particle[i].x += particle[i].dx;
-				if(particle[i].x > (shaft.x + shaft.w) * 8) {
+				if(particle[i].x > RIGHTSIDE * 8) {
 					particle[i].x -= particle[i].dx;
-					particle[i].dx *= -1;
+					particle[i].dx *= -.1;
+					if(rand() % 3) {
+						particle[i].ddy = 0;
+						if(particle[i].dy < 0) particle[i].dy = 0;
+						particle[i].dx = 0;
+					}
 				}
-				if(particle[i].x < shaft.x * 8) {
+				if(particle[i].x < LEFTSIDE * 8) {
 					particle[i].x -= particle[i].dx;
-					particle[i].dx *= -1;
+					particle[i].dx *= -.1;
+					if(rand() % 3) {
+						particle[i].ddy = 0;
+						if(particle[i].dy < 0) particle[i].dy = 0;
+						particle[i].dx = 0;
+					}
 				}
 				particle[i].y += particle[i].dy;
-				particle[i].dy += 2;
+				particle[i].dy += particle[i].ddy;
+				if(particle[i].r && !(rand() % 5)) particle[i].r--;
 			}
 		}
 
