@@ -18,10 +18,10 @@
 SDL_Surface *screen;
 
 // White elevator shaft
-SDL_Rect outershaft = { 238, 0, 164, 480 };
-SDL_Rect shaft = { 240, 0, 160, 480 };
-SDL_Rect leftwall = {LEFTSIDE, 0, 1, 480};
-SDL_Rect rightwall = {RIGHTSIDE, 0, 1, 480};
+SDL_Rect outershaft = { 238, 0, 164, SCREEN_HEIGHT };
+SDL_Rect shaft = { 240, 0, 160, SCREEN_HEIGHT };
+SDL_Rect leftwall = {LEFTSIDE, 0, 1, SCREEN_HEIGHT};
+SDL_Rect rightwall = {RIGHTSIDE, 0, 1, SCREEN_HEIGHT};
 
 enum dir { LEFT, RIGHT };
  
@@ -73,6 +73,10 @@ int main(int argc, char *argv[])
 	init_video(SDL_DOUBLEBUF);// |SDL_FULLSCREEN
 
 	int running = 1;
+	int alive = 0;
+	double y = SCREEN_HEIGHT;
+	double divisor = 10;
+	int lasttick = SDL_GetTicks();
 	enum dir door = LEFT;
 	enum dir side = LEFT;
 
@@ -94,6 +98,13 @@ int main(int argc, char *argv[])
 						case SDLK_SPACE:
 							side = (side == LEFT ? RIGHT : LEFT);
 							break;
+						case SDLK_F1: /* new game */
+							if (!alive) {
+								alive = 1;
+								y = SCREEN_HEIGHT;
+								lasttick = SDL_GetTicks();
+							}
+							break;
 						case SDLK_ESCAPE:
 							running = 0;
 							break;
@@ -110,9 +121,22 @@ int main(int argc, char *argv[])
 		SDL_FillRect(screen, &leftwall, BLACK);
 		SDL_FillRect(screen, &rightwall, BLACK);
 
-		int y = 480 - SDL_GetTicks() / 50;
+		if (alive) {
+			int tick = SDL_GetTicks();
+			double move = tick - lasttick;
+			y -= move / divisor;
+			lasttick = tick;
+		}
 		if (y > -DOORHEIGHT) {
-			draw_door(y, door);
+			int height = (int) y;
+			draw_door(height, door);
+			if (height >= FLOOR && height <= FLOOR +3 && side == door) {
+				alive = 0;
+			}
+		} else {
+			// Start new door
+			y = SCREEN_HEIGHT + DOORHEIGHT + 5;
+			door = (door == LEFT ? RIGHT : LEFT);
 		}
 
 		draw_lift(side);
