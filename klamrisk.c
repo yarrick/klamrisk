@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>
 #include <SDL/SDL.h>
 
@@ -38,7 +39,7 @@ struct particle {
 } particle[NPARTICLE];
  
 static int init_video(Uint32 flags) {
-	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
 		fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -134,14 +135,60 @@ int main(int argc, char *argv[])
 
 	int running = 1;
 	int alive = 0;
-	double y = SCREEN_HEIGHT;
-	double divisor = 10;
-	int lasttick = SDL_GetTicks();
+	int y = SCREEN_HEIGHT;
 	enum dir door = LEFT;
 	enum dir side = LEFT;
+	Uint32 lasttick = SDL_GetTicks();
 
 	while (running) {
 		SDL_Event event;
+		Uint32 now = SDL_GetTicks();
+		while(now - lasttick > 20) {
+			lasttick += 20;
+
+			// Update physics.
+			if(alive) {
+				y -= 2;
+				if (y > -DOORHEIGHT) {
+					int height = y;
+					draw_door(height, door);
+					if (height >= FLOOR && height <= FLOOR +3 && side == door) {
+						alive = 0;
+					}
+				} else {
+					// Start new door
+					y = SCREEN_HEIGHT + DOORHEIGHT + 5;
+					door = (door == LEFT ? RIGHT : LEFT);
+				}
+			}
+			for(i = 0; i < NPARTICLE; i++) {
+				if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
+					particle[i].x += particle[i].dx;
+					if(particle[i].x > RIGHTSIDE * 8) {
+						particle[i].x -= particle[i].dx;
+						particle[i].dx *= -.1;
+						if(rand() % 3) {
+							particle[i].ddy = 0;
+							if(particle[i].dy < 0) particle[i].dy = 0;
+							particle[i].dx = 0;
+						}
+					}
+					if(particle[i].x < LEFTSIDE * 8) {
+						particle[i].x -= particle[i].dx;
+						particle[i].dx *= -.1;
+						if(rand() % 3) {
+							particle[i].ddy = 0;
+							if(particle[i].dy < 0) particle[i].dy = 0;
+							particle[i].dx = 0;
+						}
+					}
+					particle[i].y += particle[i].dy;
+					particle[i].dy += particle[i].ddy;
+					if(particle[i].r && !(rand() % 5)) particle[i].r--;
+				}
+			}
+		}
+
 		while ( SDL_PollEvent(&event) ) {
 			switch (event.type) {
 				case SDL_QUIT:
@@ -162,7 +209,6 @@ int main(int argc, char *argv[])
 							if (!alive) {
 								alive = 1;
 								y = SCREEN_HEIGHT;
-								lasttick = SDL_GetTicks();
 							}
 							break;
 						case SDLK_x:
@@ -184,49 +230,9 @@ int main(int argc, char *argv[])
 		SDL_FillRect(screen, &leftwall, BLACK);
 		SDL_FillRect(screen, &rightwall, BLACK);
 
-		if (alive) {
-			int tick = SDL_GetTicks();
-			double move = tick - lasttick;
-			y -= move / divisor;
-			lasttick = tick;
-		}
-		if (y > -DOORHEIGHT) {
-			int height = (int) y;
-			draw_door(height, door);
-			if (height >= FLOOR && height <= FLOOR +3 && side == door) {
-				alive = 0;
-			}
-		} else {
-			// Start new door
-			y = SCREEN_HEIGHT + DOORHEIGHT + 5;
-			door = (door == LEFT ? RIGHT : LEFT);
-		}
-
 		for(i = 0; i < NPARTICLE; i++) {
 			if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
 				draw_circle(particle[i].x / 8, particle[i].y / 8, particle[i].r);
-				particle[i].x += particle[i].dx;
-				if(particle[i].x > RIGHTSIDE * 8) {
-					particle[i].x -= particle[i].dx;
-					particle[i].dx *= -.1;
-					if(rand() % 3) {
-						particle[i].ddy = 0;
-						if(particle[i].dy < 0) particle[i].dy = 0;
-						particle[i].dx = 0;
-					}
-				}
-				if(particle[i].x < LEFTSIDE * 8) {
-					particle[i].x -= particle[i].dx;
-					particle[i].dx *= -.1;
-					if(rand() % 3) {
-						particle[i].ddy = 0;
-						if(particle[i].dy < 0) particle[i].dy = 0;
-						particle[i].dx = 0;
-					}
-				}
-				particle[i].y += particle[i].dy;
-				particle[i].dy += particle[i].ddy;
-				if(particle[i].r && !(rand() % 5)) particle[i].r--;
 			}
 		}
 
