@@ -130,12 +130,12 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	init_video(SDL_DOUBLEBUF);// |SDL_FULLSCREEN
+	init_video(SDL_DOUBLEBUF); //|SDL_FULLSCREEN);
 	precalc();
 
 	int running = 1;
 	int alive = 0;
-	int y = SCREEN_HEIGHT;
+	int y = SCREEN_HEIGHT + DOORHEIGHT + 10;
 	enum dir door = LEFT;
 	enum dir side = LEFT;
 	Uint32 lasttick = SDL_GetTicks();
@@ -150,10 +150,10 @@ int main(int argc, char *argv[])
 			if(alive) {
 				y -= 2;
 				if (y > -DOORHEIGHT) {
-					int height = y;
-					draw_door(height, door);
-					if (height >= FLOOR && height <= FLOOR +3 && side == door) {
+					if (y >= FLOOR && y <= FLOOR +3 && side == door) {
+						// DIIEEEEEEE!!!
 						alive = 0;
+						splatter(side == LEFT ? RIGHTSIDE - 10 : LEFTSIDE + 10, FLOOR - 45);
 					}
 				} else {
 					// Start new door
@@ -203,12 +203,13 @@ int main(int argc, char *argv[])
 							door = RIGHT;
 							break;
 						case SDLK_SPACE:
-							side = (side == LEFT ? RIGHT : LEFT);
+							if (alive)
+								side = (side == LEFT ? RIGHT : LEFT);
 							break;
 						case SDLK_F1: /* new game */
 							if (!alive) {
 								alive = 1;
-								y = SCREEN_HEIGHT;
+								y = SCREEN_HEIGHT + DOORHEIGHT + 5;
 							}
 							break;
 						case SDLK_x:
@@ -229,6 +230,8 @@ int main(int argc, char *argv[])
 		SDL_FillRect(screen, &shaft, WHITE);
 		SDL_FillRect(screen, &leftwall, BLACK);
 		SDL_FillRect(screen, &rightwall, BLACK);
+
+		draw_door(y, door);
 
 		for(i = 0; i < NPARTICLE; i++) {
 			if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
