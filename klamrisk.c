@@ -156,7 +156,8 @@ int main(int argc, char *argv[])
 							door = RIGHT;
 							break;
 						case SDLK_SPACE:
-							side = (side == LEFT ? RIGHT : LEFT);
+							if (alive)
+								side = (side == LEFT ? RIGHT : LEFT);
 							break;
 						case SDLK_F1: /* new game */
 							if (!alive) {
