@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 
 	int running = 1;
 	int alive = 0;
-	double y = SCREEN_HEIGHT;
+	double y = SCREEN_HEIGHT + DOORHEIGHT + 10;
 	double divisor = 10;
 	int lasttick = SDL_GetTicks();
 	enum dir door = LEFT;
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 						case SDLK_F1: /* new game */
 							if (!alive) {
 								alive = 1;
-								y = SCREEN_HEIGHT;
+								y = SCREEN_HEIGHT + DOORHEIGHT + 5;
 								lasttick = SDL_GetTicks();
 							}
 							break;
