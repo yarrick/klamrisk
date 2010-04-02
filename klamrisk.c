@@ -13,6 +13,7 @@
 #define RIGHTSIDE 350
 
 #define DOORHEIGHT 80
+#define FLOOR 170
  
 SDL_Surface *screen;
 
@@ -22,7 +23,7 @@ SDL_Rect shaft = { 240, 0, 160, 480 };
 SDL_Rect leftwall = {LEFTSIDE, 0, 1, 480};
 SDL_Rect rightwall = {RIGHTSIDE, 0, 1, 480};
 
-enum door { LEFT, RIGHT };
+enum dir { LEFT, RIGHT };
  
 static int init_video(Uint32 flags) {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -39,7 +40,7 @@ static int init_video(Uint32 flags) {
 	return 1;
 }
 
-static void draw_door(int y, enum door side)
+static void draw_door(int y, enum dir side)
 {
 	SDL_Rect floor = { side == LEFT ? LEFTSIDE - 50 : RIGHTSIDE, y, 50, 1};
 	SDL_Rect roof = { side == LEFT ? LEFTSIDE - 50 : RIGHTSIDE, y - DOORHEIGHT, side==LEFT ? 51:50, 1};
@@ -56,12 +57,24 @@ static void draw_door(int y, enum door side)
 	SDL_FillRect(screen, &doorinside, WHITE);
 }
 
+static void draw_lift(enum dir side)
+{
+	SDL_Rect floor = { LEFTSIDE + 1, FLOOR, 60, 3};
+	SDL_Rect floorinside = { LEFTSIDE + 2, FLOOR+1, 57, 1};
+	SDL_Rect tunna = { side == LEFT ? LEFTSIDE : RIGHTSIDE - 25, FLOOR-40, 25, 40};
+
+	SDL_FillRect(screen, &floor, BLACK);
+	SDL_FillRect(screen, &floorinside, WHITE);
+	SDL_FillRect(screen, &tunna, BLACK);
+}
+
 int main(int argc, char *argv[])
 {
 	init_video(SDL_DOUBLEBUF);// |SDL_FULLSCREEN
 
 	int running = 1;
-	enum door side = LEFT;
+	enum dir door = LEFT;
+	enum dir side = LEFT;
 
 	while (running) {
 		SDL_Event event;
@@ -73,10 +86,13 @@ int main(int argc, char *argv[])
 				case SDL_KEYDOWN:
 					switch (event.key.keysym.sym) {
 						case SDLK_LEFT:
-							side = LEFT;
+							door = LEFT;
 							break;
 						case SDLK_RIGHT:
-							side = RIGHT;
+							door = RIGHT;
+							break;
+						case SDLK_SPACE:
+							side = (side == LEFT ? RIGHT : LEFT);
 							break;
 						case SDLK_ESCAPE:
 							running = 0;
@@ -96,8 +112,10 @@ int main(int argc, char *argv[])
 
 		int y = 480 - SDL_GetTicks() / 50;
 		if (y > -DOORHEIGHT) {
-			draw_door(y, side);
+			draw_door(y, door);
 		}
+
+		draw_lift(side);
 
 		// Flip
 		SDL_Flip(screen);
