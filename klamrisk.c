@@ -1,3 +1,4 @@
+#include <math.h>
 #include <SDL/SDL.h>
 
 #define SCREEN_WIDTH 640
@@ -12,6 +13,9 @@
 #define LEFTSIDE 290
 #define RIGHTSIDE 350
 
+#define CIRCLEMAX 32
+#define NPARTICLE 256
+
 #define DOORHEIGHT 80
 #define FLOOR 170
  
@@ -24,6 +28,13 @@ SDL_Rect leftwall = {LEFTSIDE, 0, 1, SCREEN_HEIGHT};
 SDL_Rect rightwall = {RIGHTSIDE, 0, 1, SCREEN_HEIGHT};
 
 enum dir { LEFT, RIGHT };
+
+char circlebuf[CIRCLEMAX][CIRCLEMAX];
+struct particle {
+	int	x, y;
+	int	dx, dy;
+	int	r;
+} particle[NPARTICLE];
  
 static int init_video(Uint32 flags) {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -38,6 +49,31 @@ static int init_video(Uint32 flags) {
 		return 0;
 	}
 	return 1;
+}
+
+static void precalc() {
+	int x, y;
+
+	for(y = 0; y < CIRCLEMAX; y++) {
+		for(x = 0; x < CIRCLEMAX; x++) {
+			int r = floor(sqrt(
+				(y - CIRCLEMAX/2) * (y - CIRCLEMAX/2) +
+				(x - CIRCLEMAX/2) * (x - CIRCLEMAX/2)));
+			circlebuf[y][x] = r;
+		}
+	}
+}
+
+static void splatter(int x, int y) {
+	int i;
+
+	for(i = 0; i < NPARTICLE; i++) {
+		particle[i].x = x * 8;
+		particle[i].y = y * 8;
+		particle[i].dx = (rand() % 64) - 32;
+		particle[i].dy = (rand() % 64) - 32;
+		particle[i].r = rand() % (CIRCLEMAX / 2);
+	}
 }
 
 static void draw_door(int y, enum dir side)
@@ -57,6 +93,25 @@ static void draw_door(int y, enum dir side)
 	SDL_FillRect(screen, &doorinside, WHITE);
 }
 
+static void draw_circle(int xpos, int ypos, int r) {
+	int x, y;
+
+	for(y = -r; y < r; y++) {
+		if(ypos + y >= 0 && ypos + y < SCREEN_HEIGHT) {
+			for(x = -r; x < r; x++) {
+				if(xpos + x >= shaft.x && xpos + x < shaft.x + shaft.w) {
+					if(circlebuf[y + CIRCLEMAX/2][x + CIRCLEMAX/2] < r) {
+						uint8_t *pix = (uint8_t *) screen->pixels + screen->pitch * (ypos + y) + 3 * (xpos + x);
+						pix[0] = 0x00;
+						pix[1] = 0x00;
+						pix[2] = 0xff;
+					}
+				}
+			}
+		}
+	}
+}
+
 static void draw_lift(enum dir side)
 {
 	SDL_Rect floor = { LEFTSIDE + 1, FLOOR, 60, 3};
@@ -70,7 +125,10 @@ static void draw_lift(enum dir side)
 
 int main(int argc, char *argv[])
 {
+	int i;
+
 	init_video(SDL_DOUBLEBUF);// |SDL_FULLSCREEN
+	precalc();
 
 	int running = 1;
 	int alive = 0;
@@ -105,6 +163,9 @@ int main(int argc, char *argv[])
 								lasttick = SDL_GetTicks();
 							}
 							break;
+						case SDLK_x:
+							splatter(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+							break;
 						case SDLK_ESCAPE:
 							running = 0;
 							break;
@@ -137,6 +198,23 @@ int main(int argc, char *argv[])
 			// Start new door
 			y = SCREEN_HEIGHT + DOORHEIGHT + 5;
 			door = (door == LEFT ? RIGHT : LEFT);
+		}
+
+		for(i = 0; i < NPARTICLE; i++) {
+			if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
+				draw_circle(particle[i].x / 8, particle[i].y / 8, particle[i].r);
+				particle[i].x += particle[i].dx;
+				if(particle[i].x > (shaft.x + shaft.w) * 8) {
+					particle[i].x -= particle[i].dx;
+					particle[i].dx *= -1;
+				}
+				if(particle[i].x < shaft.x * 8) {
+					particle[i].x -= particle[i].dx;
+					particle[i].dx *= -1;
+				}
+				particle[i].y += particle[i].dy;
+				particle[i].dy += 2;
+			}
 		}
 
 		draw_lift(side);
