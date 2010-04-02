@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	init_video(SDL_DOUBLEBUF);// |SDL_FULLSCREEN
+	init_video(SDL_DOUBLEBUF); //|SDL_FULLSCREEN);
 	precalc();
 
 	int running = 1;
@@ -194,7 +194,9 @@ int main(int argc, char *argv[])
 			int height = (int) y;
 			draw_door(height, door);
 			if (height >= FLOOR && height <= FLOOR +3 && side == door) {
+				// DIIEEEEEEE!!!
 				alive = 0;
+				splatter(side == LEFT ? RIGHTSIDE - 10 : LEFTSIDE + 10, FLOOR - 45);
 			}
 		} else {
 			// Start new door
