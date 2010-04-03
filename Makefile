@@ -15,7 +15,7 @@ klamrisk.exe: klamrisk.c fontwin.o
 	i686-mingw32-strip $@
 
 klamrisk: klamrisk.c font.o
-	gcc -o $@ $^ -lSDL -lGL -lGLU -lSDL_ttf
+	gcc -std=c99 -o $@ $^ -lSDL -lGL -lGLU -lSDL_ttf
 	strip $@
 
 clean:

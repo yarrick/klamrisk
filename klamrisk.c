@@ -19,6 +19,7 @@
 // Increase for higher resolution
 #define CIRCLEDIM 128
 #define NPARTICLE 256
+#define SOUNDFREQ 44100
 
 #define MAXDOOR 8
 
@@ -51,6 +52,13 @@ struct doors {
 	int			ypos[MAXDOOR];		// coordinate of floor, disabled if <= -ymax
 };
 
+struct oscillator {
+	uint16_t		freq, phase;
+	int			volume;			// [0, 255]
+};
+
+int16_t synthesize();
+
 // *************** Globals *************** 
  
 int screen_width, screen_height;	// in actual pixels
@@ -64,6 +72,9 @@ struct doors doors[10];
 
 int appearance_timer, rate, playing, speed;
 
+uint16_t freqtbl[64];
+volatile struct oscillator osc[2];
+
 TTF_Font *font;
 
 #ifdef WIN32
@@ -76,10 +87,27 @@ extern char _binary_Allerta_allerta_medium_ttf_end;
 
 // *************** Setup *************** 
 
-static int init_video(Uint32 flags) {
-	SDL_Rect **modes;
+static void cback(void *userdata, Uint8 *stream, int len) {
+	int16_t *buf = (int16_t *) stream;
+	int i, samples = len / sizeof(int16_t);
 
-	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+	for(i = 0; i < samples; i++) {
+		buf[i] = synthesize();
+	}
+}
+
+static int init_sdl(Uint32 flags) {
+	int i;
+	SDL_Rect **modes;
+	SDL_AudioSpec spec = {
+		.freq = SOUNDFREQ,
+		.channels = 1,
+		.format = AUDIO_S16,
+		.samples = 512,
+		.callback = cback
+	};
+
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
 		fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -100,8 +128,18 @@ static int init_video(Uint32 flags) {
 		return 0;
 	}
 
+	if(SDL_OpenAudio(&spec, 0)) {
+		fprintf(stderr, "Unable to set audio mode: %s\n", SDL_GetError());
+		return 0;
+	}
+
 	ymax = 640.0 * screen_height / screen_width;
 
+	for(i = 0; i < 64; i++) {
+		freqtbl[i] = (uint16_t) round(440.0 * 65536.0 / SOUNDFREQ * pow(pow(2, 1.0/12), i - 39));
+	}
+
+	SDL_PauseAudio(0);
 	SDL_ShowCursor(0);
 
 	return 1;
@@ -122,6 +160,83 @@ static void precalc() {
 
 	glBindTexture(GL_TEXTURE_2D, T_CIRCLE);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_ALPHA, CIRCLEDIM, CIRCLEDIM, GL_ALPHA, GL_UNSIGNED_BYTE, circlebuf);
+}
+
+// *************** Sound *************** 
+
+int16_t synthesize() {
+	int i;
+	int accum = 0;
+
+	for(i = 0; i < 2; i++) {
+		osc[i].phase += osc[i].freq;
+		accum += ((osc[i].phase & 0x8000)? -1 : 1) * osc[i].volume;
+	}
+
+	return accum << 6;
+}
+
+void music() {
+	int i;
+	static int timer = 0;
+	static int octave = 0;
+	static int currharm = 0;
+	static int lastnote = 0;
+	static int harmcount = 32;
+	struct harmony {
+		int		base;
+		int		scale[8];
+	} harmony[] = {
+		{
+			12,
+			{24, 24, 26, 28, 29, 31, 36, 36}
+		},
+		{
+			9,
+			{21, 24, 26, 28, 31, 33, 35, 36}
+		},
+		{
+			7,
+			{23, 24, 26, 26, 28, 31, 35, 38}
+		},
+		{
+			5,
+			{21, 24, 26, 28, 29, 33, 36, 36}
+		},
+		{
+			4,
+			{23, 26, 28, 28, 31, 35, 35, 36}
+		}
+	};
+
+	for(i = 0; i < 2; i++) {
+		int vol = osc[i].volume;
+
+		vol -= 16;
+		if(vol < 0) vol = 0;
+		osc[i].volume = vol;
+	}
+
+	if(timer) {
+		timer--;
+	} else {
+		if(harmcount) {
+			harmcount--;
+		} else {
+			currharm = rand() % (sizeof(harmony) / sizeof(*harmony));
+			harmcount = ((rand() % 3) + 1) * 16;
+		}
+		osc[0].freq = freqtbl[harmony[currharm].base + (octave? 12 : 0)];
+		osc[0].volume = 255;
+		if(rand() % 4) {
+			lastnote += (rand() % 4) - 2;
+			lastnote &= 7;
+			osc[1].freq = freqtbl[harmony[currharm].scale[lastnote]];
+			osc[1].volume = 255;
+		}
+		octave ^= 1;
+		timer = 10;
+	}
 }
 
 static void load_font() {
@@ -203,7 +318,6 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, d
 	SDL_FreeSurface(intermediary);
 	glDisable(GL_TEXTURE_2D);
 }
-
 
 // *************** Graphic primitives *************** 
 
@@ -487,20 +601,24 @@ static void newgame(int shafts) {
 	speed = 2;
 }
 
+static void add_door() {
+	int which = rand() % nbr_doors;
+	int i;
+
+	for(i = 0; i < MAXDOOR; i++) {
+		if(doors[which].ypos[i] <= -ymax) {
+			doors[which].ypos[i] = ymax + DOORHEIGHT;
+			break;
+		}
+	}
+}
+
 static void add_doors() {
 	if(rate) {
 		if(appearance_timer) {
 			appearance_timer--;
 		} else {
-			int which = rand() % nbr_doors;
-			int i;
-
-			for(i = 0; i < MAXDOOR; i++) {
-				if(doors[which].ypos[i] <= -ymax) {
-					doors[which].ypos[i] = ymax + DOORHEIGHT;
-					break;
-				}
-			}
+			add_door();
 			appearance_timer = rate;
 		}
 	}
@@ -512,7 +630,7 @@ int main(int argc, char *argv[])
 	int running = 1;
 	Uint32 lasttick;
 
-	init_video(0); // SDL_FULLSCREEN;
+	init_sdl(0); // SDL_FULLSCREEN;
 	precalc();
 	load_font();
 	if (!font)
@@ -530,6 +648,7 @@ int main(int argc, char *argv[])
 			for(i = 0; i < nbr_shafts; i++) {
 				shaft_physics(&shaft[i], &doors[i], &doors[i + 1]);
 			}
+			music();
 			add_doors();
 		}
 
