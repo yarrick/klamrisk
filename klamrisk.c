@@ -367,7 +367,7 @@ static void draw_doors(struct doors *d) {
 			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i], 50);
 			glColor3d(0, 0, 0);
 			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2, 50);
-			fillrect(WALLPOS, d->ypos[i] - 2, OUTERPOS, d->ypos[i], 50);
+			fillrect(WALLPOS, d->ypos[i] - 4, OUTERPOS, d->ypos[i], 50);
 			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, WALLPOS+6, d->ypos[i], 50);
 			fillrect(WALLPOS+8, d->ypos[i] - DOORHEIGHT, WALLPOS+10, d->ypos[i], 50);
 		}
@@ -381,7 +381,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 	if(shaft->animframe > 10) {
 		offset = -speed * (shaft->animframe - 10);
 		if(shaft->animframe > 60) {
-			fade = (shaft->animframe - 60.0) / 30.0;
+			fade = (shaft->animframe - 60.0) / 20.0;
 			if(fade > 1) fade = 1;
 		}
 	} else {
@@ -428,6 +428,8 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				fillrect(-30, -52, 0, 0, 30);
 				glColor3d(1, 1, 1);
 				fillrect(-28, -50, -2, -2, 30);
+				glColor3d(fade, fade, fade);
+				draw_circle(-29, FLOOR-2, 4, 4, 30);
 			glPopMatrix();
 			glPushMatrix();
 				// Victim head
@@ -442,6 +444,10 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				draw_circle(-19, -62, 9 + skew, 9 - skew, 30);
 				// Victim body
 				glTranslated(-3 * skew, skew, 0);
+				double fall = shaft->animframe  - 60;
+				if (fall < 0) fall = 0;
+				if (fall > 9) fall = 9;
+				glTranslated(skew, 0.3 * fall * fall, 0);
 				draw_circle(-19, -32, 9 - skew, 20 + skew, 30);
 				fillrect(-16, -15, -23, 0, 30);
 			glPopMatrix();
@@ -521,7 +527,7 @@ static void splat(struct shaft *shaft) {
 
 	for(i = 0; i < NPARTICLE; i++) {
 		shaft->particle[i].x = SPLATTERPOS * 8;
-		shaft->particle[i].y = (FLOOR - 45) * 8;
+		shaft->particle[i].y = (FLOOR - 63) * 8;
 		shaft->particle[i].dx = (rand() % 64) - 32;
 		shaft->particle[i].dy = (rand() % 64) - 48;
 		shaft->particle[i].r = rand() % (CIRCLEMAX / 2);
@@ -664,7 +670,7 @@ int main(int argc, char *argv[])
 	int running = 1;
 	Uint32 lasttick;
 
-	init_sdl(0); // ;
+	init_sdl();
 	precalc();
 	load_font();
 	if (!font)
