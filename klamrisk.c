@@ -64,7 +64,7 @@ int appearance_timer, rate;
 static int init_video(Uint32 flags) {
 	SDL_Rect **modes;
 
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -177,8 +177,11 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 
 		// Draw the lift
 		glPushMatrix();
-			glColor3d(1, 1, 1);
+			glColor3d(0.83, 0.83, 0.83);
 			fillrect(-OUTERPOS, -ymax, OUTERPOS, ymax);
+			glColor3d(1, 1, 1);
+			fillrect(-WALLPOS-2, -ymax, WALLPOS+2, ymax);
+
 			glTranslated(0, offset, 0);
 			glColor3d(0, 0, 0);
 			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2);
