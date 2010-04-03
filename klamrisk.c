@@ -656,9 +656,8 @@ static void shaft_physics(struct shaft *shaft, struct doors *left, struct doors 
 }
 
 static void resetshaft(struct shaft *shaft) {
+	memset(shaft, 0, sizeof(struct shaft));
 	shaft->alive = 1;
-	shaft->animframe = 0;
-	shaft->grace = 0;
 	shaft->direction = LEFT;
 }
 
