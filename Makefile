@@ -19,4 +19,4 @@ klamrisk: klamrisk.c font.o
 	strip $@
 
 clean:
-	rm -f klamrisk klamrisk-win32.exe font.o fontwin.o
+	rm -f klamrisk klamrisk.exe font.o fontwin.o
