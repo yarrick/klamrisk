@@ -54,10 +54,12 @@ int screen_width, screen_height;	// in actual pixels
 double ymax;				// in made-up units
 SDL_Surface *screen;
 
-struct shaft shaft[4];
-struct doors doors[5];
+int nbr_shafts;
+int nbr_doors;
+struct shaft shaft[10];
+struct doors doors[10];
 
-int appearance_timer, rate;
+int appearance_timer, rate, playing;
 
 // *************** Setup *************** 
 
@@ -111,17 +113,17 @@ static void precalc() {
 
 // *************** Graphic primitives *************** 
 
-static void fillrect(double x1, double y1, double x2, double y2) {
+static void fillrect(double x1, double y1, double x2, double y2, double z) {
 	glDisable(GL_TEXTURE_2D);
 	glBegin(GL_QUADS);
-	glVertex2d(x1, y1);
-	glVertex2d(x1, y2);
-	glVertex2d(x2, y2);
-	glVertex2d(x2, y1);
+	glVertex3d(x1, y1, z);
+	glVertex3d(x1, y2, z);
+	glVertex3d(x2, y2, z);
+	glVertex3d(x2, y1, z);
 	glEnd();
 }
 
-static void draw_circle(int xpos, int ypos, int r) {
+static void draw_circle(int xpos, int ypos, int r, double z) {
 	int x, y;
 
 	glColor3d(1, 0, 0);
@@ -130,13 +132,13 @@ static void draw_circle(int xpos, int ypos, int r) {
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0, 0);
-	glVertex2d(xpos - r, ypos - r);
+	glVertex3d(xpos - r, ypos - r, z);
 	glTexCoord2d(0, 1);
-	glVertex2d(xpos - r, ypos + r);
+	glVertex3d(xpos - r, ypos + r, z);
 	glTexCoord2d(1, 1);
-	glVertex2d(xpos + r, ypos + r);
+	glVertex3d(xpos + r, ypos + r, z);
 	glTexCoord2d(1, 0);
-	glVertex2d(xpos + r, ypos - r);
+	glVertex3d(xpos + r, ypos - r, z);
 	glEnd();
 	glDisable(GL_BLEND);
 	glDisable(GL_TEXTURE_2D);
@@ -150,16 +152,17 @@ static void draw_doors(struct doors *d) {
 	// Draw doors on the right side. We're invoked under a flipped transformation in order to draw left doors.
 
 	glColor3d(0, 0, 0);
-	fillrect(WALLPOS+2, -ymax, WALLPOS+4, ymax);
+	fillrect(WALLPOS+0, -ymax, WALLPOS+2, ymax, 50);
 	for(i = 0; i < MAXDOOR; i++) {
 		if(d->ypos[i] > -ymax) {
 			glColor3d(1, 1, 1);
-			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i]);
+			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i], 30);
+			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i], 50);
 			glColor3d(0, 0, 0);
-			fillrect(WALLPOS+2, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2);
-			fillrect(WALLPOS+2, d->ypos[i] - 2, OUTERPOS, d->ypos[i]);
-			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, WALLPOS+6, d->ypos[i]);
-			fillrect(WALLPOS+8, d->ypos[i] - DOORHEIGHT, WALLPOS+10, d->ypos[i]);
+			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2, 50);
+			fillrect(WALLPOS, d->ypos[i] - 2, OUTERPOS, d->ypos[i], 50);
+			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, WALLPOS+6, d->ypos[i], 50);
+			fillrect(WALLPOS+8, d->ypos[i] - DOORHEIGHT, WALLPOS+10, d->ypos[i], 50);
 		}
 	}
 }
@@ -175,17 +178,17 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 	glPushMatrix();
 		glTranslated(xpos, 0, 0);
 
+		glColor3d(0.83, 0.83, 0.83);
+		fillrect(-OUTERPOS, -ymax, OUTERPOS, ymax, 50);
+		glColor3d(1, 1, 1);
+		fillrect(-WALLPOS-2, -ymax, WALLPOS+2, ymax, 30);
+
 		// Draw the lift
 		glPushMatrix();
-			glColor3d(0.83, 0.83, 0.83);
-			fillrect(-OUTERPOS, -ymax, OUTERPOS, ymax);
-			glColor3d(1, 1, 1);
-			fillrect(-WALLPOS-2, -ymax, WALLPOS+2, ymax);
-
 			glTranslated(0, offset, 0);
 			glColor3d(0, 0, 0);
-			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2);
-			fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2);
+			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2, 30);
+			fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2, 30);
 		glPopMatrix();
 
 		// Draw doors on both sides
@@ -200,26 +203,33 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 			if(shaft->direction == LEFT) glScaled(-1, 1, 1);
 			glTranslated(0, offset, 0);
 			glPushMatrix();
-				glTranslated(30, FLOOR - 2, 0);
+				glTranslated(28, FLOOR - 2, 0);
 				angle = shaft->animframe * 2;
 				if(angle > 30) angle = 30;
 				glTranslated(-angle / 16, -angle / 2, 0);
 				glRotated(-angle, 0, 0, 1);
 				glColor3d(0, 0, 0);
-				fillrect(-30, -52, 0, 0);
+				fillrect(-30, -52, 0, 0, 30);
 				glColor3d(1, 1, 1);
-				fillrect(-28, -50, -2, -2);
+				fillrect(-28, -50, -2, -2, 30);
 			glPopMatrix();
 		glPopMatrix();
 
 		// Draw the red lemonade
+		glDepthFunc(GL_LESS);
 		if(shaft->direction == RIGHT) glScaled(-1, 1, 1);
 		for(i = 0; i < NPARTICLE; i++) {
 			if(shaft->particle[i].r > 0 && shaft->particle[i].y < (ymax + CIRCLEMAX) * 8) {
-				draw_circle(shaft->particle[i].x / 8, shaft->particle[i].y / 8, shaft->particle[i].r);
+				draw_circle(shaft->particle[i].x / 8, shaft->particle[i].y / 8, shaft->particle[i].r, 40 + i*.01);
 			}
 		}
+		glDepthFunc(GL_ALWAYS);
+
 	glPopMatrix();
+}
+
+static void drawtitle() {
+	;
 }
 
 static void drawframe() {
@@ -227,19 +237,26 @@ static void drawframe() {
 
 	// Set background
 	glClearColor(.992, 1, .196, 0);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	if (!playing) {
+		drawtitle();
+		return;
+	}
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho(-640, 640, ymax, -ymax, -1, 1);
+	glOrtho(-640, 640, ymax, -ymax, -100, 100);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_ALWAYS);
 
 	//todo
 	//glColor3d(.47, .47, .47);
 	//fillrect(-82, 0, 82, 480);
 
-	for(i = 0; i < 4; i++) {
+	for(i = 0; i < nbr_shafts; i++) {
 		draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
 	}
 }
@@ -323,7 +340,7 @@ static void resetshaft(struct shaft *shaft) {
 static void resetdoors(struct doors *d) {
 	int i;
 
-	for(i = 0; i < MAXDOOR; i++) {
+	for(i = 0; i < nbr_doors; i++) {
 		d->ypos[i] = -ymax;
 	}
 }
@@ -334,13 +351,20 @@ static void flip(struct shaft *shaft) {
 	}
 }
 
-static void newgame() {
+static void newgame(int shafts) {
 	int i;
 
-	for(i = 0; i < 4; i++) {
+	if (shafts > 4)
+		return;
+
+	playing = 1;
+	nbr_doors = shafts+1;
+	nbr_shafts = shafts;
+	
+	for(i = 0; i < shafts; i++) {
 		resetshaft(&shaft[i]);
 	}
-	for(i = 0; i < 5; i++) {
+	for(i = 0; i < shafts + 1; i++) {
 		resetdoors(&doors[i]);
 	}
 	rate = 50;
@@ -352,7 +376,7 @@ static void add_doors() {
 		if(appearance_timer) {
 			appearance_timer--;
 		} else {
-			int which = rand() % 5;
+			int which = rand() % nbr_doors;
 			int i;
 
 			for(i = 0; i < MAXDOOR; i++) {
@@ -374,18 +398,17 @@ int main(int argc, char *argv[])
 
 	init_video(0); // SDL_FULLSCREEN;
 	precalc();
-	newgame();
-
 	lasttick = SDL_GetTicks();
+	playing = 0;
 	while (running) {
 		SDL_Event event;
 		Uint32 now = SDL_GetTicks();
 		while(now - lasttick > 20) {
 			lasttick += 20;
-			for(i = 0; i < 5; i++) {
+			for(i = 0; i < nbr_doors; i++) {
 				doors_physics(&doors[i]);
 			}
-			for(i = 0; i < 4; i++) {
+			for(i = 0; i < nbr_shafts; i++) {
 				shaft_physics(&shaft[i], &doors[i], &doors[i + 1]);
 			}
 			add_doors();
@@ -411,7 +434,10 @@ int main(int argc, char *argv[])
 							flip(&shaft[3]);
 							break;
 						case SDLK_SPACE:
-							newgame();
+							newgame(4);
+							break;
+						case SDLK_F1:
+							newgame(1);
 							break;
 						case SDLK_ESCAPE:
 							running = 0;
