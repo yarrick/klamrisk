@@ -40,6 +40,7 @@ struct particle {
 struct shaft {
 	int			alive;
 	int			animframe;
+	int			grace;
 	direction_t		direction;
 	struct particle		particle[NPARTICLE];
 };
@@ -59,7 +60,7 @@ int nbr_doors;
 struct shaft shaft[10];
 struct doors doors[10];
 
-int appearance_timer, rate, playing;
+int appearance_timer, rate, playing, speed;
 
 // *************** Setup *************** 
 
@@ -169,11 +170,16 @@ static void draw_doors(struct doors *d) {
 
 static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *right, int xpos) {
 	int i, angle, offset;
+	double fade = 0;
 
 	if(shaft->animframe > 10) {
-		offset = -2 * (shaft->animframe - 10);
+		offset = -speed * (shaft->animframe - 10);
+		if(shaft->animframe > 60) {
+			fade = (shaft->animframe - 60.0) / 40.0;
+			if(fade > 1) fade = 1;
+		}
 	} else {
-		offset = 0;
+		offset = shaft->grace;
 	}
 	glPushMatrix();
 		glTranslated(xpos, 0, 0);
@@ -186,7 +192,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 		// Draw the lift
 		glPushMatrix();
 			glTranslated(0, offset, 0);
-			glColor3d(0, 0, 0);
+			glColor3d(fade, fade, fade);
 			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2, 30);
 			fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2, 30);
 		glPopMatrix();
@@ -208,7 +214,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				if(angle > 30) angle = 30;
 				glTranslated(-angle / 16, -angle / 2, 0);
 				glRotated(-angle, 0, 0, 1);
-				glColor3d(0, 0, 0);
+				glColor3d(fade, fade, fade);
 				fillrect(-30, -52, 0, 0, 30);
 				glColor3d(1, 1, 1);
 				fillrect(-28, -50, -2, -2, 30);
@@ -281,7 +287,7 @@ static void doors_physics(struct doors *d) {
 
 	for(i = 0; i < MAXDOOR; i++) {
 		if(d->ypos[i] > -ymax) {
-			d->ypos[i] -= 2;
+			d->ypos[i] -= speed;
 		}
 	}
 }
@@ -292,15 +298,25 @@ static void shaft_physics(struct shaft *shaft, struct doors *left, struct doors 
 	if(shaft->alive) {
 		struct doors *dangerous = (shaft->direction == LEFT)? left : right;
 
-		for(i = 0; i < MAXDOOR; i++) {
-			if(dangerous->ypos[i] > FLOOR - 3 && dangerous->ypos[i] < FLOOR) {
-				shaft->alive = 0;
+		if(!shaft->grace) {
+			for(i = 0; i < MAXDOOR; i++) {
+				if(dangerous->ypos[i] > FLOOR - 3 && dangerous->ypos[i] < FLOOR) {
+					shaft->alive = 0;
+				}
 			}
 		}
+		shaft->grace -= speed;
+		if(shaft->grace < 0) shaft->grace = 0;
 	} else {
 		shaft->animframe++;
 		if(shaft->animframe == 15) {
 			splat(shaft);
+		} else if(shaft->animframe == 45) {
+			//speed++;
+		} else if(shaft->animframe == 100) {
+			shaft->alive = 1;
+			shaft->animframe = 0;
+			shaft->grace = ymax + DOORHEIGHT;
 		}
 	}
 	for(i = 0; i < NPARTICLE; i++) {
@@ -340,7 +356,7 @@ static void resetshaft(struct shaft *shaft) {
 static void resetdoors(struct doors *d) {
 	int i;
 
-	for(i = 0; i < nbr_doors; i++) {
+	for(i = 0; i < MAXDOOR; i++) {
 		d->ypos[i] = -ymax;
 	}
 }
@@ -369,6 +385,7 @@ static void newgame(int shafts) {
 	}
 	rate = 50;
 	appearance_timer = rate;
+	speed = 2;
 }
 
 static void add_doors() {
