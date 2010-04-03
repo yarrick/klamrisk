@@ -37,6 +37,13 @@ enum {
 	T_HERO,
 	T_LIVECODED,
 	T_MENU,
+	T_TRAINER,
+	T_INSTRUCT1,
+	T_INSTRUCT2,
+	T_1,
+	T_2,
+	T_3,
+	T_4,
 	NTEXTURE
 };
 
@@ -219,6 +226,13 @@ static void precalc() {
 	maketext(T_HERO, "HERO");
 	maketext(T_LIVECODED, "Live-coded at Breakpoint 2010");
 	maketext(T_MENU, "Press space (or T for trainer)");
+	maketext(T_TRAINER, "TRAINER MODE");
+	maketext(T_INSTRUCT1, "Avoid dangerous edges.");
+	maketext(T_INSTRUCT2, "Press 1 to toggle direction.");
+	maketext(T_1, "1");
+	maketext(T_2, "2");
+	maketext(T_3, "3");
+	maketext(T_4, "4");
 }
 
 // *************** Sound *************** 
@@ -397,7 +411,7 @@ static void draw_doors(struct doors *d) {
 	}
 }
 
-static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *right, int xpos) {
+static void draw_shaft(struct shaft *shaft, int tid, struct doors *left, struct doors *right, int xpos) {
 	int i, angle, offset;
 	double fade = 0;
 
@@ -490,6 +504,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 		glDepthFunc(GL_ALWAYS);
 
 	glPopMatrix();
+	render_text(tid, xpos, -ymax + 40, .4);
 }
 
 static void drawtitle() {
@@ -540,7 +555,12 @@ static void drawframe() {
 		//fillrect(-82, 0, 82, 480);
 
 		for(i = 0; i < nbr_shafts; i++) {
-			draw_shaft(&shaft[i], &doors[i], &doors[i + 1], (160 * (i - 2) + 80) * (nbr_shafts > 1));
+			draw_shaft(&shaft[i], T_1 + i, &doors[i], &doors[i + 1], (160 * (i - 2) + 80) * (nbr_shafts > 1));
+		}
+		if(nbr_shafts == 1) {
+			render_text(T_TRAINER, -600 + texturesize[T_TRAINER][0]/2 * .6, -290, .6);
+			render_text(T_INSTRUCT1, -600 + texturesize[T_INSTRUCT1][0]/2 * .3, -200, .3);
+			render_text(T_INSTRUCT2, -600 + texturesize[T_INSTRUCT2][0]/2 * .3, -150, .3);
 		}
 	}
 }
