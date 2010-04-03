@@ -715,13 +715,18 @@ int main(int argc, char *argv[])
 							flip(&shaft[3]);
 							break;
 						case SDLK_SPACE:
-							newgame(4);
+							if (!playing)
+								newgame(4);
 							break;
 						case SDLK_t:
-							newgame(1);
+							if (!playing)
+								newgame(1);
 							break;
 						case SDLK_ESCAPE:
-							running = 0;
+							if (playing)
+								playing = 0;
+							else
+								running = 0;
 							break;
 					}
 					break;
