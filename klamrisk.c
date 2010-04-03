@@ -11,7 +11,7 @@
 #define WALLPOS 30
 #define SPLATTERPOS 20
 #define DOORHEIGHT 100
-#define FLOOR (-ymax/2)		/* origo in middle of screen */
+#define FLOOR (0)		/* origo in middle of screen */
  
 #define CIRCLEMAX 32
 
@@ -154,7 +154,7 @@ static void draw_doors(struct doors *d) {
 	for(i = 0; i < MAXDOOR; i++) {
 		if(d->ypos[i] > -ymax) {
 			glColor3d(1, 1, 1);
-			fillrect(WALLPOS-2, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i]);
+			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i]);
 			glColor3d(0, 0, 0);
 			fillrect(WALLPOS+2, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2);
 			fillrect(WALLPOS+2, d->ypos[i] - 2, OUTERPOS, d->ypos[i]);
@@ -165,23 +165,24 @@ static void draw_doors(struct doors *d) {
 }
 
 static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *right, int xpos) {
-	int i;
+	int i, angle, offset;
 
+	if(shaft->animframe > 10) {
+		offset = -2 * (shaft->animframe - 10);
+	} else {
+		offset = 0;
+	}
 	glPushMatrix();
 		glTranslated(xpos, 0, 0);
 
 		// Draw the lift
 		glPushMatrix();
-			if(shaft->direction == RIGHT) glScaled(-1, 1, 1);
-
 			glColor3d(1, 1, 1);
 			fillrect(-OUTERPOS, -ymax, OUTERPOS, ymax);
+			glTranslated(0, offset, 0);
 			glColor3d(0, 0, 0);
 			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2);
 			fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2);
-
-			//SDL_Rect tunna = { side == LEFT ? LEFTSIDE : RIGHTSIDE - 25, FLOOR-40, 25, 40};
-			//SDL_FillRect(screen, &tunna, BLACK);
 		glPopMatrix();
 
 		// Draw doors on both sides
@@ -189,6 +190,23 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 		glPushMatrix();
 			glScaled(-1, 1, 1);
 			draw_doors(left);
+		glPopMatrix();
+
+		// Draw the contents of the lift
+		glPushMatrix();
+			if(shaft->direction == LEFT) glScaled(-1, 1, 1);
+			glTranslated(0, offset, 0);
+			glPushMatrix();
+				glTranslated(30, FLOOR - 2, 0);
+				angle = shaft->animframe * 2;
+				if(angle > 30) angle = 30;
+				glTranslated(-angle / 16, -angle / 2, 0);
+				glRotated(-angle, 0, 0, 1);
+				glColor3d(0, 0, 0);
+				fillrect(-30, -52, 0, 0);
+				glColor3d(1, 1, 1);
+				fillrect(-28, -50, -2, -2);
+			glPopMatrix();
 		glPopMatrix();
 
 		// Draw the red lemonade
@@ -225,6 +243,19 @@ static void drawframe() {
 
 // *************** Gameplay *************** 
 
+static void splat(struct shaft *shaft) {
+	int i;
+
+	for(i = 0; i < NPARTICLE; i++) {
+		shaft->particle[i].x = SPLATTERPOS * 8;
+		shaft->particle[i].y = (FLOOR - 45) * 8;
+		shaft->particle[i].dx = (rand() % 64) - 32;
+		shaft->particle[i].dy = (rand() % 64) - 48;
+		shaft->particle[i].r = rand() % (CIRCLEMAX / 2);
+		shaft->particle[i].ddy = 2;
+	}
+}
+
 static void doors_physics(struct doors *d) {
 	int i;
 
@@ -239,18 +270,18 @@ static void shaft_physics(struct shaft *shaft, struct doors *left, struct doors 
 	int i;
 
 	if(shaft->alive) {
-		/*y -= 2;
-		if (y > -DOORHEIGHT) {
-			if (y >= FLOOR && y <= FLOOR +3 && side == door) {
-				// DIIEEEEEEE!!!
-				alive = 0;
-				splatter(side == LEFT ? SPLATTERPOS : -SPLATTERPOS, FLOOR - 45);
+		struct doors *dangerous = (shaft->direction == LEFT)? left : right;
+
+		for(i = 0; i < MAXDOOR; i++) {
+			if(dangerous->ypos[i] > FLOOR - 3 && dangerous->ypos[i] < FLOOR) {
+				shaft->alive = 0;
 			}
-		} else {
-			// Start new door
-			y = SCREEN_HEIGHT + DOORHEIGHT + 5;
-			door = (door == LEFT ? RIGHT : LEFT);
-		}*/
+		}
+	} else {
+		shaft->animframe++;
+		if(shaft->animframe == 15) {
+			splat(shaft);
+		}
 	}
 	for(i = 0; i < NPARTICLE; i++) {
 		if(shaft->particle[i].r > 0 && shaft->particle[i].y < (ymax + CIRCLEMAX) * 8) {
@@ -297,20 +328,6 @@ static void resetdoors(struct doors *d) {
 static void flip(struct shaft *shaft) {
 	if(shaft->alive) {
 		shaft->direction ^= (LEFT ^ RIGHT);
-	}
-}
-
-static void die(struct shaft *shaft) {
-	int i;
-
-	shaft->alive = 0;
-	for(i = 0; i < NPARTICLE; i++) {
-		shaft->particle[i].x = SPLATTERPOS * 8;
-		shaft->particle[i].y = (FLOOR - 45) * 8;
-		shaft->particle[i].dx = (rand() % 64) - 32;
-		shaft->particle[i].dy = (rand() % 64) - 48;
-		shaft->particle[i].r = rand() % (CIRCLEMAX / 2);
-		shaft->particle[i].ddy = 2;
 	}
 }
 
