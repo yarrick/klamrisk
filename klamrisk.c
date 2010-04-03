@@ -302,9 +302,13 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 			if(shaft->direction == LEFT) glScaled(-1, 1, 1);
 			glTranslated(0, offset, 0);
 			glPushMatrix();
-				glTranslated(28, FLOOR - 2, 0);
+				// Trash can
+				double y = FLOOR - 2;
+				y -= shaft->animframe * 0.8;
+				if (y < FLOOR-DOORHEIGHT+70) y = FLOOR-DOORHEIGHT + 70;
+				glTranslated(28, y, 0);
 				angle = shaft->animframe * 2;
-				if(angle > 30) angle = 30;
+				if(angle > 33) angle = 33;
 				glTranslated(-angle / 16, -angle / 2, 0);
 				glRotated(-angle, 0, 0, 1);
 				glColor3d(fade, fade, fade);
