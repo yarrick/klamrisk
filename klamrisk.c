@@ -380,7 +380,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 	if(shaft->animframe > 10) {
 		offset = -speed * (shaft->animframe - 10);
 		if(shaft->animframe > 60) {
-			fade = (shaft->animframe - 60.0) / 30.0;
+			fade = (shaft->animframe - 60.0) / 20.0;
 			if(fade > 1) fade = 1;
 		}
 	} else {
@@ -441,6 +441,10 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				draw_circle(-19, -62, 9 + skew, 9 - skew, 30);
 				// Victim body
 				glTranslated(-3 * skew, skew, 0);
+				double fall = shaft->animframe  - 60;
+				if (fall < 0) fall = 0;
+				if (fall > 10) fall = 10;
+				glTranslated(skew, 0.3 * fall * fall, 0);
 				draw_circle(-19, -32, 9 - skew, 20 + skew, 30);
 				fillrect(-16, -15, -23, 0, 30);
 			glPopMatrix();
@@ -647,7 +651,7 @@ int main(int argc, char *argv[])
 	int running = 1;
 	Uint32 lasttick;
 
-	init_sdl(0); // ;
+	init_sdl();
 	precalc();
 	load_font();
 	if (!font)
