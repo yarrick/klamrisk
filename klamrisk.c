@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
 #include <SDL/SDL_ttf.h>
@@ -90,7 +91,7 @@ struct doors doors[10];
 int appearance_timer, rate, playing, speed;
 
 uint16_t freqtbl[64];
-volatile struct oscillator osc[2];
+volatile struct oscillator osc[3];
 
 TTF_Font *font;
 
@@ -241,16 +242,17 @@ int16_t synthesize() {
 	int i;
 	int accum = 0;
 
-	for(i = 0; i < 2; i++) {
+	osc[2].freq = freqtbl[(osc[2].volume >> 4) * 3];
+	for(i = 0; i < 3; i++) {
 		osc[i].phase += osc[i].freq;
 		accum += ((osc[i].phase & 0x8000)? -1 : 1) * osc[i].volume;
 	}
 
-	return accum << 6;
+	return accum << 5;
 }
 
 void music() {
-	int i;
+	int i, vol;
 	static int timer = 0;
 	static int octave = 0;
 	static int currharm = 0;
@@ -283,12 +285,13 @@ void music() {
 	};
 
 	for(i = 0; i < 2; i++) {
-		int vol = osc[i].volume;
-
-		vol -= 16;
+		vol = osc[i].volume - 16;
 		if(vol < 0) vol = 0;
 		osc[i].volume = vol;
 	}
+	vol = osc[2].volume - 6;
+	if(vol < 0) vol = 0;
+	osc[2].volume = vol;
 
 	if(timer) {
 		timer--;
@@ -611,6 +614,7 @@ static void shaft_physics(struct shaft *shaft, struct doors *left, struct doors 
 		shaft->animframe++;
 		if(shaft->animframe == 15) {
 			splat(shaft);
+			osc[2].volume = 255;
 		} else if(shaft->animframe == 45) {
 			//speed++;
 		} else if(shaft->animframe == 100) {
@@ -720,9 +724,11 @@ int main(int argc, char *argv[])
 
 	init_sdl();
 	load_font();
+	if (!font) return 1;
 	precalc();
-	if (!font)
-		return 1;
+
+	srand(time(0));
+
 	lasttick = SDL_GetTicks();
 	playing = 0;
 	while (running) {
