@@ -3,6 +3,7 @@
 #include <math.h>
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
+#include <SDL/SDL_ttf.h>
 
 // These dimensions are in made-up units, where the width of an elevator shaft
 // is 60 pixels, and pixels are square.
@@ -29,6 +30,7 @@ typedef enum {
 
 enum {
 	T_CIRCLE,
+	T_FONT,
 };
 
 struct particle {
@@ -72,6 +74,16 @@ int appearance_timer, rate, playing, speed;
 
 uint16_t freqtbl[64];
 volatile struct oscillator osc[2];
+
+TTF_Font *font;
+
+#ifdef WIN32
+extern char binary_Allerta_allerta_medium_ttf_start;
+extern char binary_Allerta_allerta_medium_ttf_end;
+#else
+extern char _binary_Allerta_allerta_medium_ttf_start;
+extern char _binary_Allerta_allerta_medium_ttf_end;
+#endif
 
 // *************** Setup *************** 
 
@@ -227,6 +239,86 @@ void music() {
 	}
 }
 
+static void load_font() {
+	TTF_Init();
+
+#ifdef WIN32
+	int len = (int) &binary_Allerta_allerta_medium_ttf_end;
+	len -= (int) &binary_Allerta_allerta_medium_ttf_start;
+	SDL_RWops *fontdata = SDL_RWFromMem(&binary_Allerta_allerta_medium_ttf_start, len);
+#else
+	int len = (int) &_binary_Allerta_allerta_medium_ttf_end;
+	len -= (int) &_binary_Allerta_allerta_medium_ttf_start;
+	SDL_RWops *fontdata = SDL_RWFromMem(&_binary_Allerta_allerta_medium_ttf_start, len);
+#endif
+
+	font =TTF_OpenFontRW(fontdata, 1, 14);
+}
+
+static int nextpoweroftwo(int x) {
+	double logbase2 = log(x) / log(2);
+	return round(pow(2,ceil(logbase2)));
+}
+
+static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, double y) {
+	SDL_Surface *initial;
+	SDL_Surface *intermediary;
+	SDL_Rect rect;
+	int w,h;
+
+	/* Use SDL_TTF to render our text */
+	initial = TTF_RenderText_Blended(font, text, color);
+
+	/* Convert the rendered text to a known format */
+	w = nextpoweroftwo(initial->w);
+	h = nextpoweroftwo(initial->h);
+
+	printf("text h%d, w%d\n", h,w);
+
+	intermediary = SDL_CreateRGBSurface(0, w, h, 32, 
+			0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+
+	SDL_BlitSurface(initial, 0, intermediary, 0);
+
+	/* Tell GL about our new texture */
+	glBindTexture(GL_TEXTURE_2D, T_FONT);
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
+//	glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_BGRA, 
+//		GL_UNSIGNED_BYTE, intermediary->pixels );
+
+	/* GL_NEAREST looks horrible, if scaled... */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+
+	/* prepare to render our texture */
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, T_FONT);
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	/* Draw a quad at location */
+	glBegin(GL_QUADS);
+	/* Recall that the origin is in the lower-left corner
+	 * 		   That is why the TexCoords specify different corners
+	 * 		   		   than the Vertex coors seem to. */
+	glTexCoord2f(0.0f, 1.0f); 
+	glVertex2f(x, y);
+	glTexCoord2f(1.0f, 1.0f); 
+	glVertex2f(x + w, y);
+	glTexCoord2f(1.0f, 0.0f); 
+	glVertex2f(x + w, y + h);
+	glTexCoord2f(0.0f, 0.0f); 
+	glVertex2f(x    , y + h);
+	glEnd();
+
+	/* Bad things happen if we delete the texture before it finishes */
+	glFinish();
+
+	/* Clean up */
+	SDL_FreeSurface(initial);
+	SDL_FreeSurface(intermediary);
+	glDisable(GL_TEXTURE_2D);
+}
+
 // *************** Graphic primitives *************** 
 
 static void fillrect(double x1, double y1, double x2, double y2, double z) {
@@ -350,7 +442,9 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 }
 
 static void drawtitle() {
-	;
+	SDL_Color blk = {0,0,0};
+
+	//render_text("VARNING KLÄMRISK!", font, blk, -0.5, 0.5);
 }
 
 static void drawframe() {
@@ -534,6 +628,9 @@ int main(int argc, char *argv[])
 
 	init_sdl(0); // SDL_FULLSCREEN;
 	precalc();
+	load_font();
+	if (!font)
+		return 1;
 	lasttick = SDL_GetTicks();
 	playing = 0;
 	while (running) {
