@@ -252,7 +252,7 @@ static void load_font() {
 	SDL_RWops *fontdata = SDL_RWFromMem(&_binary_Allerta_allerta_medium_ttf_start, len);
 #endif
 
-	font =TTF_OpenFontRW(fontdata, 1, 14);
+	font = TTF_OpenFontRW(fontdata, 1, 100);
 }
 
 static int nextpoweroftwo(int x) {
@@ -260,31 +260,28 @@ static int nextpoweroftwo(int x) {
 	return round(pow(2,ceil(logbase2)));
 }
 
-static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, double y) {
+static void render_text(char *text, TTF_Font *font, double x, double y, double zoom) {
+	SDL_Color color = {255, 255, 255};
 	SDL_Surface *initial;
 	SDL_Surface *intermediary;
 	SDL_Rect rect;
-	int w,h;
+	double w, h;
 
 	/* Use SDL_TTF to render our text */
 	initial = TTF_RenderText_Blended(font, text, color);
 
 	/* Convert the rendered text to a known format */
-	w = nextpoweroftwo(initial->w);
-	h = nextpoweroftwo(initial->h);
-
-	printf("text h%d, w%d\n", h,w);
+	w = initial->w;
+	h = initial->h;
 
 	intermediary = SDL_CreateRGBSurface(0, w, h, 32, 
-			0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
+			0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000);
 
 	SDL_BlitSurface(initial, 0, intermediary, 0);
 
 	/* Tell GL about our new texture */
 	glBindTexture(GL_TEXTURE_2D, T_FONT);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
-//	glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_BGRA, 
-//		GL_UNSIGNED_BYTE, intermediary->pixels );
 
 	/* GL_NEAREST looks horrible, if scaled... */
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -294,21 +291,22 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, d
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, T_FONT);
 	glColor3f(1.0f, 1.0f, 1.0f);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR);
 
 	/* Draw a quad at location */
 	glBegin(GL_QUADS);
-	/* Recall that the origin is in the lower-left corner
-	 * 		   That is why the TexCoords specify different corners
-	 * 		   		   than the Vertex coors seem to. */
-	glTexCoord2f(0.0f, 1.0f); 
-	glVertex2f(x, y);
-	glTexCoord2f(1.0f, 1.0f); 
-	glVertex2f(x + w, y);
-	glTexCoord2f(1.0f, 0.0f); 
-	glVertex2f(x + w, y + h);
-	glTexCoord2f(0.0f, 0.0f); 
-	glVertex2f(x    , y + h);
+	glTexCoord2d(0, 0); 
+	glVertex2f(x - w/2 * zoom, y);
+	glTexCoord2d(1, 0); 
+	glVertex2f(x + w/2 * zoom, y);
+	glTexCoord2d(1, 1); 
+	glVertex2f(x + w/2 * zoom, y + h * zoom);
+	glTexCoord2d(0, 1); 
+	glVertex2f(x - w/2 * zoom, y + h * zoom);
 	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
 
 	/* Bad things happen if we delete the texture before it finishes */
 	glFinish();
@@ -316,7 +314,6 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, d
 	/* Clean up */
 	SDL_FreeSurface(initial);
 	SDL_FreeSurface(intermediary);
-	glDisable(GL_TEXTURE_2D);
 }
 
 // *************** Graphic primitives *************** 
@@ -446,9 +443,26 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 }
 
 static void drawtitle() {
-	SDL_Color blk = {0,0,0};
-
-	//render_text("VARNING KLÄMRISK!", font, blk, -0.5, 0.5);
+	glColor3d(0, 0, 0);
+	glBegin(GL_TRIANGLES);
+	glVertex3d(0, -390, 0);
+	glVertex3d(400, 210, 0);
+	glVertex3d(-400, 210, 0);
+	glEnd();
+	glColor3d(.992, 1, .196);
+	glBegin(GL_TRIANGLES);
+	glVertex3d(0, -360, 0);
+	glVertex3d(370, 195, 0);
+	glVertex3d(-370, 195, 0);
+	glEnd();
+	render_text("kryo", font, 0, -230, .5);
+	render_text("presents", font, 0, -160, .4);
+	render_text("KLAMRISK", font, 0, -30, .8);
+	render_text("HERO", font, 0, 70, 1.3);
+	render_text("Live-coded at Breakpoint 2010", font, 0, 240, .4);
+	render_text("Press space (or T for trainer)", font, 0, 290, .4);
+	glColor3d(1, 0, 0);
+	draw_circle(-10, 10, 100, 0);
 }
 
 static void drawframe() {
@@ -458,11 +472,6 @@ static void drawframe() {
 	glClearColor(.992, 1, .196, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (!playing) {
-		drawtitle();
-		return;
-	}
-
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(-640, 640, ymax, -ymax, -100, 100);
@@ -471,12 +480,16 @@ static void drawframe() {
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_ALWAYS);
 
-	//todo
-	//glColor3d(.47, .47, .47);
-	//fillrect(-82, 0, 82, 480);
+	if(!playing) {
+		drawtitle();
+	} else {
+		//todo
+		//glColor3d(.47, .47, .47);
+		//fillrect(-82, 0, 82, 480);
 
-	for(i = 0; i < nbr_shafts; i++) {
-		draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
+		for(i = 0; i < nbr_shafts; i++) {
+			draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
+		}
 	}
 }
 
