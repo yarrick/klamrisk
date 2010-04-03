@@ -691,7 +691,7 @@ int main(int argc, char *argv[])
 						case SDLK_SPACE:
 							newgame(4);
 							break;
-						case SDLK_T:
+						case SDLK_t:
 							newgame(1);
 							break;
 						case SDLK_ESCAPE:
