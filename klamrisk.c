@@ -40,6 +40,7 @@ enum {
 	T_TRAINER,
 	T_INSTRUCT1,
 	T_INSTRUCT2,
+	T_INSTRUCT3,
 	T_1,
 	T_2,
 	T_3,
@@ -89,6 +90,7 @@ struct doors doors[10];
 
 int appearance_timer, rate, playing, speed;
 
+Uint32 menutime;
 uint16_t freqtbl[64];
 volatile struct oscillator osc[2];
 
@@ -229,6 +231,7 @@ static void precalc() {
 	maketext(T_TRAINER, "TRAINER MODE");
 	maketext(T_INSTRUCT1, "Avoid dangerous edges.");
 	maketext(T_INSTRUCT2, "Press 1 to toggle direction.");
+	maketext(T_INSTRUCT3, "ESC to go back. Good luck!");
 	maketext(T_1, "1");
 	maketext(T_2, "2");
 	maketext(T_3, "3");
@@ -563,6 +566,7 @@ static void drawframe() {
 			render_text(T_TRAINER, -600 + texturesize[T_TRAINER][0]/2 * .6, -290, .6);
 			render_text(T_INSTRUCT1, -600 + texturesize[T_INSTRUCT1][0]/2 * .3, -200, .3);
 			render_text(T_INSTRUCT2, -600 + texturesize[T_INSTRUCT2][0]/2 * .3, -150, .3);
+			render_text(T_INSTRUCT3, -600 + texturesize[T_INSTRUCT3][0]/2 * .3, -100, .3);
 		}
 	}
 }
@@ -725,6 +729,7 @@ int main(int argc, char *argv[])
 		return 1;
 	lasttick = SDL_GetTicks();
 	playing = 0;
+	menutime = lasttick;
 	while (running) {
 		SDL_Event event;
 		Uint32 now = SDL_GetTicks();
@@ -768,10 +773,12 @@ int main(int argc, char *argv[])
 								newgame(1);
 							break;
 						case SDLK_ESCAPE:
-							if (playing)
+							if (playing) {
 								playing = 0;
-							else
+								menutime = lasttick;
+							} else {
 								running = 0;
+							}
 							break;
 					}
 					break;
