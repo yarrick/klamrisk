@@ -427,6 +427,8 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				fillrect(-30, -52, 0, 0, 30);
 				glColor3d(1, 1, 1);
 				fillrect(-28, -50, -2, -2, 30);
+				glColor3d(fade, fade, fade);
+				draw_circle(-29, FLOOR-2, 4, 4, 30);
 			glPopMatrix();
 			glPushMatrix();
 				// Victim head
@@ -443,7 +445,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				glTranslated(-3 * skew, skew, 0);
 				double fall = shaft->animframe  - 60;
 				if (fall < 0) fall = 0;
-				if (fall > 10) fall = 10;
+				if (fall > 9) fall = 9;
 				glTranslated(skew, 0.3 * fall * fall, 0);
 				draw_circle(-19, -32, 9 - skew, 20 + skew, 30);
 				fillrect(-16, -15, -23, 0, 30);
@@ -508,7 +510,7 @@ static void splat(struct shaft *shaft) {
 
 	for(i = 0; i < NPARTICLE; i++) {
 		shaft->particle[i].x = SPLATTERPOS * 8;
-		shaft->particle[i].y = (FLOOR - 45) * 8;
+		shaft->particle[i].y = (FLOOR - 63) * 8;
 		shaft->particle[i].dx = (rand() % 64) - 32;
 		shaft->particle[i].dy = (rand() % 64) - 48;
 		shaft->particle[i].r = rand() % (CIRCLEMAX / 2);
