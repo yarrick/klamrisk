@@ -335,6 +335,7 @@ static void fillrect(double x1, double y1, double x2, double y2, double z) {
 
 static void draw_circle(double xpos, double ypos, double wspan, double hspan, double z) {
 	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texture[T_CIRCLE]);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBegin(GL_QUADS);
@@ -489,7 +490,8 @@ static void drawtitle() {
 	render_text("Live-coded at Breakpoint 2010", font, 0, 240, .4);
 	render_text("Press space (or T for trainer)", font, 0, 290, .4);
 	glColor3d(1, 0, 0);
-	draw_circle(-10, 10, 10, 10, 0);
+	draw_circle(-78, -35, 6, 6, 0);
+	draw_circle(-62, -35, 6, 6, 0);
 }
 
 static void drawframe() {
