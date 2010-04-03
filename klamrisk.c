@@ -30,7 +30,13 @@ typedef enum {
 
 enum {
 	T_CIRCLE,
-	T_FONT,
+	T_EXCLAM,
+	T_KRYO,
+	T_PRESENTS,
+	T_KLAMRISK,
+	T_HERO,
+	T_LIVECODED,
+	T_MENU,
 	NTEXTURE
 };
 
@@ -61,6 +67,7 @@ struct oscillator {
 int16_t synthesize();
 
 int texture[NTEXTURE];
+double texturesize[NTEXTURE][2];
 
 // *************** Globals *************** 
  
@@ -151,6 +158,44 @@ static int init_sdl() {
 	return 1;
 }
 
+static void maketext(int tid, char *text) {
+	SDL_Color color = {255, 255, 255};
+	SDL_Surface *initial;
+	SDL_Surface *intermediary;
+	SDL_Rect rect;
+	double w, h;
+
+	/* Use SDL_TTF to render our text */
+	initial = TTF_RenderText_Blended(font, text, color);
+
+	/* Convert the rendered text to a known format */
+	w = initial->w;
+	h = initial->h;
+
+	texturesize[tid][0] = w;
+	texturesize[tid][1] = h;
+
+	intermediary = SDL_CreateRGBSurface(0, w, h, 32, 
+			0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000);
+
+	SDL_BlitSurface(initial, 0, intermediary, 0);
+
+	/* Tell GL about our new texture */
+	glBindTexture(GL_TEXTURE_2D, texture[tid]);
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
+
+	/* GL_NEAREST looks horrible, if scaled... */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
+
+	/* Bad things happen if we delete the texture before it finishes */
+	//glFinish();
+
+	/* Clean up */
+	SDL_FreeSurface(initial);
+	SDL_FreeSurface(intermediary);
+}
+
 static void precalc() {
 	int x, y;
 	uint8_t circlebuf[CIRCLEDIM][CIRCLEDIM];
@@ -166,6 +211,14 @@ static void precalc() {
 
 	glBindTexture(GL_TEXTURE_2D, texture[T_CIRCLE]);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_ALPHA, CIRCLEDIM, CIRCLEDIM, GL_ALPHA, GL_UNSIGNED_BYTE, circlebuf);
+
+	maketext(T_EXCLAM, "!");
+	maketext(T_KRYO, "kryo");
+	maketext(T_PRESENTS, "presents");
+	maketext(T_KLAMRISK, "KLAMRISK");
+	maketext(T_HERO, "HERO");
+	maketext(T_LIVECODED, "Live-coded at Breakpoint 2010");
+	maketext(T_MENU, "Press space (or T for trainer)");
 }
 
 // *************** Sound *************** 
@@ -234,7 +287,7 @@ void music() {
 		}
 		osc[0].freq = freqtbl[harmony[currharm].base + (octave? 12 : 0)];
 		osc[0].volume = 255;
-		if(rand() % 4) {
+		if(playing && (rand() % 4)) {
 			lastnote += (rand() % 4) - 2;
 			lastnote &= 7;
 			osc[1].freq = freqtbl[harmony[currharm].scale[lastnote]];
@@ -266,35 +319,11 @@ static int nextpoweroftwo(int x) {
 	return round(pow(2,ceil(logbase2)));
 }
 
-static void render_text(char *text, TTF_Font *font, double x, double y, double zoom) {
-	SDL_Color color = {255, 255, 255};
-	SDL_Surface *initial;
-	SDL_Surface *intermediary;
-	SDL_Rect rect;
-	double w, h;
+static void render_text(int tid, double x, double y, double zoom) {
+	double w = texturesize[tid][0], h = texturesize[tid][1];
 
-	/* Use SDL_TTF to render our text */
-	initial = TTF_RenderText_Blended(font, text, color);
-
-	/* Convert the rendered text to a known format */
-	w = initial->w;
-	h = initial->h;
-
-	intermediary = SDL_CreateRGBSurface(0, w, h, 32, 
-			0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000);
-
-	SDL_BlitSurface(initial, 0, intermediary, 0);
-
-	/* Tell GL about our new texture */
-	glBindTexture(GL_TEXTURE_2D, texture[T_FONT]);
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
-
-	/* GL_NEAREST looks horrible, if scaled... */
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	
-
-	/* prepare to render our texture */
 	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texture[tid]);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR);
@@ -312,13 +341,6 @@ static void render_text(char *text, TTF_Font *font, double x, double y, double z
 	glEnd();
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_BLEND);
-
-	/* Bad things happen if we delete the texture before it finishes */
-	glFinish();
-
-	/* Clean up */
-	SDL_FreeSurface(initial);
-	SDL_FreeSurface(intermediary);
 }
 
 // *************** Graphic primitives *************** 
@@ -483,13 +505,13 @@ static void drawtitle() {
 	glVertex3d(370, 195, 0);
 	glVertex3d(-370, 195, 0);
 	glEnd();
-	render_text("!", font, 0, -320, 1.5);
-	render_text("kryo", font, 0, -180, .5);
-	render_text("presents", font, 0, -120, .4);
-	render_text("KLAMRISK", font, 0, -25, .8);
-	render_text("HERO", font, 0, 70, 1.3);
-	render_text("Live-coded at Breakpoint 2010", font, 0, 240, .4);
-	render_text("Press space (or T for trainer)", font, 0, 290, .4);
+	render_text(T_EXCLAM, 0, -320, 1.5);
+	render_text(T_KRYO, 0, -180, .5);
+	render_text(T_PRESENTS, 0, -120, .4);
+	render_text(T_KLAMRISK, 0, -25, .8);
+	render_text(T_HERO, 0, 70, 1.3);
+	render_text(T_LIVECODED, 0, 240, .4);
+	render_text(T_MENU, 0, 290, .4);
 	glColor3d(1, 0, 0);
 	draw_circle(-78, -35, 6, 6, 0);
 	draw_circle(-62, -35, 6, 6, 0);
@@ -674,8 +696,8 @@ int main(int argc, char *argv[])
 	Uint32 lasttick;
 
 	init_sdl();
-	precalc();
 	load_font();
+	precalc();
 	if (!font)
 		return 1;
 	lasttick = SDL_GetTicks();
