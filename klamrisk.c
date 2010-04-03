@@ -540,7 +540,7 @@ static void drawframe() {
 		//fillrect(-82, 0, 82, 480);
 
 		for(i = 0; i < nbr_shafts; i++) {
-			draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
+			draw_shaft(&shaft[i], &doors[i], &doors[i + 1], (160 * (i - 2) + 80) * (nbr_shafts > 1));
 		}
 	}
 }
