@@ -31,6 +31,7 @@ typedef enum {
 enum {
 	T_CIRCLE,
 	T_FONT,
+	NTEXTURE
 };
 
 struct particle {
@@ -58,6 +59,8 @@ struct oscillator {
 };
 
 int16_t synthesize();
+
+int texture[NTEXTURE];
 
 // *************** Globals *************** 
  
@@ -134,6 +137,8 @@ static int init_sdl() {
 		return 0;
 	}
 
+	glGenTextures(NTEXTURE, texture);
+
 	ymax = 640.0 * screen_height / screen_width;
 
 	for(i = 0; i < 64; i++) {
@@ -159,7 +164,7 @@ static void precalc() {
 		}
 	}
 
-	glBindTexture(GL_TEXTURE_2D, T_CIRCLE);
+	glBindTexture(GL_TEXTURE_2D, texture[T_CIRCLE]);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_ALPHA, CIRCLEDIM, CIRCLEDIM, GL_ALPHA, GL_UNSIGNED_BYTE, circlebuf);
 }
 
@@ -281,7 +286,7 @@ static void render_text(char *text, TTF_Font *font, double x, double y, double z
 	SDL_BlitSurface(initial, 0, intermediary, 0);
 
 	/* Tell GL about our new texture */
-	glBindTexture(GL_TEXTURE_2D, T_FONT);
+	glBindTexture(GL_TEXTURE_2D, texture[T_FONT]);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
 
 	/* GL_NEAREST looks horrible, if scaled... */
@@ -290,7 +295,6 @@ static void render_text(char *text, TTF_Font *font, double x, double y, double z
 
 	/* prepare to render our texture */
 	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, T_FONT);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE_MINUS_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR);
@@ -479,7 +483,7 @@ static void drawtitle() {
 	render_text("Live-coded at Breakpoint 2010", font, 0, 240, .4);
 	render_text("Press space (or T for trainer)", font, 0, 290, .4);
 	glColor3d(1, 0, 0);
-	draw_circle(-10, 10, 100, 0);
+	draw_circle(-10, 10, 10, 10, 0);
 }
 
 static void drawframe() {
@@ -704,7 +708,7 @@ int main(int argc, char *argv[])
 						case SDLK_SPACE:
 							newgame(4);
 							break;
-						case SDLK_T:
+						case SDLK_t:
 							newgame(1);
 							break;
 						case SDLK_ESCAPE:
