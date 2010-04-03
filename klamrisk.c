@@ -740,11 +740,13 @@ int main(int argc, char *argv[])
 		Uint32 now = SDL_GetTicks();
 		while(now - lasttick > 20) {
 			lasttick += 20;
-			for(i = 0; i < nbr_doors; i++) {
-				doors_physics(&doors[i]);
-			}
-			for(i = 0; i < nbr_shafts; i++) {
-				shaft_physics(&shaft[i], &doors[i], &doors[i + 1]);
+			if(playing) {
+				for(i = 0; i < nbr_doors; i++) {
+					doors_physics(&doors[i]);
+				}
+				for(i = 0; i < nbr_shafts; i++) {
+					shaft_physics(&shaft[i], &doors[i], &doors[i + 1]);
+				}
 			}
 			music();
 			add_doors();
