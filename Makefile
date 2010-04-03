@@ -2,15 +2,21 @@ CC=gcc
 
 all: klamrisk
 
-both: klamrisk klamrisk-win32.exe
+both: klamrisk klamrisk.exe
 
-klamrisk-win32.exe: klamrisk.c
-	i686-mingw32-gcc $^ -lmingw32 -lSDLmain -lSDL -lopengl32 -lglu32 -o $@ 
-	i686-mingw32-strip $@
+font.o: Allerta/allerta_medium.ttf
+	objcopy --input binary --output elf32-i386 --binary-architecture i386 $^ $@
 
-klamrisk: klamrisk.c
-	$(CC) -o $@ $^ -lSDL -lGL -lGLU
-	strip $@
+fontwin.o: Allerta/allerta_medium.ttf
+	i686-mingw32-objcopy --input binary --output pe-i386 --binary-architecture i386 $^ $@
+
+klamrisk.exe: klamrisk.c fontwin.o
+	i686-mingw32-gcc $^ -lmingw32 -lSDLmain -lSDL -lopengl32 -lglu32 -o $@ -DWIN32
+	#i686-mingw32-strip $@
+
+klamrisk: klamrisk.c font.o
+	gcc -o $@ $^ -lSDL -lGL -lGLU
+	#strip $@
 
 clean:
-	rm -f klamrisk klamrisk-win32.exe
+	rm -f klamrisk klamrisk-win32.exe font.o fontwin.o

@@ -61,6 +61,14 @@ struct doors doors[10];
 
 int appearance_timer, rate, playing;
 
+#ifdef WIN32
+extern char binary_Allerta_allerta_medium_ttf_start;
+extern char binary_Allerta_allerta_medium_ttf_end;
+#else
+extern char _binary_Allerta_allerta_medium_ttf_start;
+extern char _binary_Allerta_allerta_medium_ttf_end;
+#endif
+
 // *************** Setup *************** 
 
 static int init_video(Uint32 flags) {
@@ -109,6 +117,21 @@ static void precalc() {
 
 	glBindTexture(GL_TEXTURE_2D, T_CIRCLE);
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_ALPHA, CIRCLEDIM, CIRCLEDIM, GL_ALPHA, GL_UNSIGNED_BYTE, circlebuf);
+}
+
+static void load_font() {
+
+#ifdef WIN32
+	int len = (int) &binary_Allerta_allerta_medium_ttf_end;
+	len -= (int) &binary_Allerta_allerta_medium_ttf_start;
+	SDL_RWops *font = SDL_RWFromMem(&binary_Allerta_allerta_medium_ttf_start, len);
+#else
+	int len = (int) &_binary_Allerta_allerta_medium_ttf_end;
+	len -= (int) &_binary_Allerta_allerta_medium_ttf_start;
+	SDL_RWops *font = SDL_RWFromMem(&_binary_Allerta_allerta_medium_ttf_start, len);
+#endif
+
+	SDL_FreeRW(font);
 }
 
 // *************** Graphic primitives *************** 
@@ -374,6 +397,7 @@ int main(int argc, char *argv[])
 
 	init_video(0); // SDL_FULLSCREEN;
 	precalc();
+	load_font();
 	lasttick = SDL_GetTicks();
 	playing = 0;
 	while (running) {
