@@ -482,9 +482,10 @@ static void drawtitle() {
 	glVertex3d(370, 195, 0);
 	glVertex3d(-370, 195, 0);
 	glEnd();
-	render_text("kryo", font, 0, -230, .5);
-	render_text("presents", font, 0, -160, .4);
-	render_text("KLAMRISK", font, 0, -30, .8);
+	render_text("!", font, 0, -320, 1.5);
+	render_text("kryo", font, 0, -180, .5);
+	render_text("presents", font, 0, -120, .4);
+	render_text("KLAMRISK", font, 0, -25, .8);
 	render_text("HERO", font, 0, 70, 1.3);
 	render_text("Live-coded at Breakpoint 2010", font, 0, 240, .4);
 	render_text("Press space (or T for trainer)", font, 0, 290, .4);
