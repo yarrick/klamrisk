@@ -366,7 +366,7 @@ static void draw_doors(struct doors *d) {
 			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i], 50);
 			glColor3d(0, 0, 0);
 			fillrect(WALLPOS, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2, 50);
-			fillrect(WALLPOS, d->ypos[i] - 2, OUTERPOS, d->ypos[i], 50);
+			fillrect(WALLPOS, d->ypos[i] - 4, OUTERPOS, d->ypos[i], 50);
 			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, WALLPOS+6, d->ypos[i], 50);
 			fillrect(WALLPOS+8, d->ypos[i] - DOORHEIGHT, WALLPOS+10, d->ypos[i], 50);
 		}
