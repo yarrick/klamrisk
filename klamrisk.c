@@ -4,36 +4,62 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
 
-int screen_width, screen_height;
+// These dimensions are in made-up units, where the width of an elevator shaft
+// is 60 pixels, and pixels are square.
 
-// Legacy, not related to actual dimensions:
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
-
+#define OUTERPOS 80
 #define WALLPOS 30
 #define SPLATTERPOS 20
-
+#define DOORHEIGHT 100
+#define FLOOR (-ymax/2)		/* origo in middle of screen */
+ 
 #define CIRCLEMAX 32
+
+// Increase for higher resolution
 #define CIRCLEDIM 128
 #define NPARTICLE 256
 
-#define DOORHEIGHT 80
-#define FLOOR 170
- 
-SDL_Surface *screen;
+#define MAXDOOR 8
 
-enum dir { LEFT, RIGHT };
+typedef enum {
+	LEFT,
+	RIGHT
+} direction_t;
 
-struct particle {
-	int	x, y;
-	int	dx, dy;
-	int	ddy;
-	int	r;
-} particle[NPARTICLE];
- 
 enum {
 	T_CIRCLE,
 };
+
+struct particle {
+	int			x, y;
+	int			dx, dy;
+	int			ddy;
+	int			r;
+};
+
+struct shaft {
+	int			alive;
+	int			animframe;
+	direction_t		direction;
+	struct particle		particle[NPARTICLE];
+};
+
+struct doors {
+	int			ypos[MAXDOOR];		// coordinate of floor, disabled if <= -ymax
+};
+
+// *************** Globals *************** 
+ 
+int screen_width, screen_height;	// in actual pixels
+double ymax;				// in made-up units
+SDL_Surface *screen;
+
+struct shaft shaft[4];
+struct doors doors[5];
+
+int appearance_timer, rate;
+
+// *************** Setup *************** 
 
 static int init_video(Uint32 flags) {
 	SDL_Rect **modes;
@@ -59,6 +85,8 @@ static int init_video(Uint32 flags) {
 		return 0;
 	}
 
+	ymax = 640.0 * screen_height / screen_width;
+
 	SDL_ShowCursor(0);
 
 	return 1;
@@ -81,18 +109,7 @@ static void precalc() {
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_ALPHA, CIRCLEDIM, CIRCLEDIM, GL_ALPHA, GL_UNSIGNED_BYTE, circlebuf);
 }
 
-static void splatter(int x, int y) {
-	int i;
-
-	for(i = 0; i < NPARTICLE; i++) {
-		particle[i].x = x * 8;
-		particle[i].y = y * 8;
-		particle[i].dx = (rand() % 64) - 32;
-		particle[i].dy = (rand() % 64) - 48;
-		particle[i].r = rand() % (CIRCLEMAX / 2);
-		particle[i].ddy = 2;
-	}
-}
+// *************** Graphic primitives *************** 
 
 static void fillrect(double x1, double y1, double x2, double y2) {
 	glDisable(GL_TEXTURE_2D);
@@ -102,22 +119,6 @@ static void fillrect(double x1, double y1, double x2, double y2) {
 	glVertex2d(x2, y2);
 	glVertex2d(x2, y1);
 	glEnd();
-}
-
-static void draw_door(int y, enum dir side) {
-	if(side == RIGHT) {
-		glScaled(-1, 1, 1);
-	}
-	glColor3d(1, 1, 1);
-	fillrect(-WALLPOS-2, y - DOORHEIGHT, -WALLPOS+1, y);
-	glColor3d(0, 0, 0);
-	fillrect(-WALLPOS-50, y, -WALLPOS-1, y + 2);
-	fillrect(-WALLPOS-50, y - DOORHEIGHT - 2, -WALLPOS-1, y - DOORHEIGHT);
-	fillrect(-WALLPOS-10, y - DOORHEIGHT, -WALLPOS-8, y);
-	fillrect(-WALLPOS-6, y - DOORHEIGHT, -WALLPOS-4, y);
-	if(side == RIGHT) {
-		glScaled(-1, 1, 1);
-	}
 }
 
 static void draw_circle(int xpos, int ypos, int r) {
@@ -141,77 +142,233 @@ static void draw_circle(int xpos, int ypos, int r) {
 	glDisable(GL_TEXTURE_2D);
 }
 
-static void draw_lift(enum dir side)
-{
-	glColor3d(0, 0, 0);
-	fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2);
-	fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2);
+// *************** Complex drawing operations *************** 
 
-	//SDL_Rect tunna = { side == LEFT ? LEFTSIDE : RIGHTSIDE - 25, FLOOR-40, 25, 40};
-	//SDL_FillRect(screen, &tunna, BLACK);
+static void draw_doors(struct doors *d) {
+	int i;
+
+	// Draw doors on the right side. We're invoked under a flipped transformation in order to draw left doors.
+
+	glColor3d(0, 0, 0);
+	fillrect(WALLPOS+2, -ymax, WALLPOS+4, ymax);
+	for(i = 0; i < MAXDOOR; i++) {
+		if(d->ypos[i] > -ymax) {
+			glColor3d(1, 1, 1);
+			fillrect(WALLPOS-2, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i]);
+			glColor3d(0, 0, 0);
+			fillrect(WALLPOS+2, d->ypos[i] - DOORHEIGHT, OUTERPOS, d->ypos[i] - DOORHEIGHT + 2);
+			fillrect(WALLPOS+2, d->ypos[i] - 2, OUTERPOS, d->ypos[i]);
+			fillrect(WALLPOS+4, d->ypos[i] - DOORHEIGHT, WALLPOS+6, d->ypos[i]);
+			fillrect(WALLPOS+8, d->ypos[i] - DOORHEIGHT, WALLPOS+10, d->ypos[i]);
+		}
+	}
+}
+
+static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *right, int xpos) {
+	int i;
+
+	glPushMatrix();
+		glTranslated(xpos, 0, 0);
+
+		// Draw the lift
+		glPushMatrix();
+			if(shaft->direction == RIGHT) glScaled(-1, 1, 1);
+
+			glColor3d(1, 1, 1);
+			fillrect(-OUTERPOS, -ymax, OUTERPOS, ymax);
+			glColor3d(0, 0, 0);
+			fillrect(-WALLPOS, FLOOR, WALLPOS, FLOOR + 2);
+			fillrect(-WALLPOS, FLOOR - DOORHEIGHT, WALLPOS, FLOOR - DOORHEIGHT + 2);
+
+			//SDL_Rect tunna = { side == LEFT ? LEFTSIDE : RIGHTSIDE - 25, FLOOR-40, 25, 40};
+			//SDL_FillRect(screen, &tunna, BLACK);
+		glPopMatrix();
+
+		// Draw doors on both sides
+		draw_doors(right);
+		glPushMatrix();
+			glScaled(-1, 1, 1);
+			draw_doors(left);
+		glPopMatrix();
+
+		// Draw the red lemonade
+		if(shaft->direction == RIGHT) glScaled(-1, 1, 1);
+		for(i = 0; i < NPARTICLE; i++) {
+			if(shaft->particle[i].r > 0 && shaft->particle[i].y < (ymax + CIRCLEMAX) * 8) {
+				draw_circle(shaft->particle[i].x / 8, shaft->particle[i].y / 8, shaft->particle[i].r);
+			}
+		}
+	glPopMatrix();
+}
+
+static void drawframe() {
+	int i;
+
+	// Set background
+	glClearColor(.992, 1, .196, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-640, 640, ymax, -ymax, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	//todo
+	//glColor3d(.47, .47, .47);
+	//fillrect(-82, 0, 82, 480);
+
+	for(i = 0; i < 4; i++) {
+		draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
+	}
+}
+
+// *************** Gameplay *************** 
+
+static void doors_physics(struct doors *d) {
+	int i;
+
+	for(i = 0; i < MAXDOOR; i++) {
+		if(d->ypos[i] > -ymax) {
+			d->ypos[i] -= 2;
+		}
+	}
+}
+
+static void shaft_physics(struct shaft *shaft, struct doors *left, struct doors *right) {
+	int i;
+
+	if(shaft->alive) {
+		/*y -= 2;
+		if (y > -DOORHEIGHT) {
+			if (y >= FLOOR && y <= FLOOR +3 && side == door) {
+				// DIIEEEEEEE!!!
+				alive = 0;
+				splatter(side == LEFT ? SPLATTERPOS : -SPLATTERPOS, FLOOR - 45);
+			}
+		} else {
+			// Start new door
+			y = SCREEN_HEIGHT + DOORHEIGHT + 5;
+			door = (door == LEFT ? RIGHT : LEFT);
+		}*/
+	}
+	for(i = 0; i < NPARTICLE; i++) {
+		if(shaft->particle[i].r > 0 && shaft->particle[i].y < (ymax + CIRCLEMAX) * 8) {
+			shaft->particle[i].x += shaft->particle[i].dx;
+			if(shaft->particle[i].x > WALLPOS * 8) {
+				shaft->particle[i].x -= shaft->particle[i].dx;
+				shaft->particle[i].dx *= -.1;
+				if(rand() % 3) {
+					shaft->particle[i].ddy = 0;
+					if(shaft->particle[i].dy < 0) shaft->particle[i].dy = 0;
+					shaft->particle[i].dx = 0;
+				}
+			}
+			if(shaft->particle[i].x < -WALLPOS * 8) {
+				shaft->particle[i].x -= shaft->particle[i].dx;
+				shaft->particle[i].dx *= -.1;
+				if(rand() % 3) {
+					shaft->particle[i].ddy = 0;
+					if(shaft->particle[i].dy < 0) shaft->particle[i].dy = 0;
+					shaft->particle[i].dx = 0;
+				}
+			}
+			shaft->particle[i].y += shaft->particle[i].dy;
+			shaft->particle[i].dy += shaft->particle[i].ddy;
+			if(shaft->particle[i].r && !(rand() % 5)) shaft->particle[i].r--;
+		}
+	}
+}
+
+static void resetshaft(struct shaft *shaft) {
+	shaft->alive = 1;
+	shaft->animframe = 0;
+	shaft->direction = LEFT;
+}
+
+static void resetdoors(struct doors *d) {
+	int i;
+
+	for(i = 0; i < MAXDOOR; i++) {
+		d->ypos[i] = -ymax;
+	}
+}
+
+static void flip(struct shaft *shaft) {
+	if(shaft->alive) {
+		shaft->direction ^= (LEFT ^ RIGHT);
+	}
+}
+
+static void die(struct shaft *shaft) {
+	int i;
+
+	shaft->alive = 0;
+	for(i = 0; i < NPARTICLE; i++) {
+		shaft->particle[i].x = SPLATTERPOS * 8;
+		shaft->particle[i].y = (FLOOR - 45) * 8;
+		shaft->particle[i].dx = (rand() % 64) - 32;
+		shaft->particle[i].dy = (rand() % 64) - 48;
+		shaft->particle[i].r = rand() % (CIRCLEMAX / 2);
+		shaft->particle[i].ddy = 2;
+	}
+}
+
+static void newgame() {
+	int i;
+
+	for(i = 0; i < 4; i++) {
+		resetshaft(&shaft[i]);
+	}
+	for(i = 0; i < 5; i++) {
+		resetdoors(&doors[i]);
+	}
+	rate = 50;
+	appearance_timer = rate;
+}
+
+static void add_doors() {
+	if(rate) {
+		if(appearance_timer) {
+			appearance_timer--;
+		} else {
+			int which = rand() % 5;
+			int i;
+
+			for(i = 0; i < MAXDOOR; i++) {
+				if(doors[which].ypos[i] <= -ymax) {
+					doors[which].ypos[i] = ymax + DOORHEIGHT;
+					break;
+				}
+			}
+			appearance_timer = rate;
+		}
+	}
 }
 
 int main(int argc, char *argv[])
 {
 	int i;
-
-	init_video(0); // SDL_FULLSCREEN);
-	precalc();
-
 	int running = 1;
-	int alive = 0;
-	int y = SCREEN_HEIGHT + DOORHEIGHT + 10;
-	enum dir door = LEFT;
-	enum dir side = LEFT;
-	Uint32 lasttick = SDL_GetTicks();
+	Uint32 lasttick;
 
+	init_video(0); // SDL_FULLSCREEN;
+	precalc();
+	newgame();
+
+	lasttick = SDL_GetTicks();
 	while (running) {
 		SDL_Event event;
 		Uint32 now = SDL_GetTicks();
 		while(now - lasttick > 20) {
 			lasttick += 20;
-
-			// Update physics.
-			if(alive) {
-				y -= 2;
-				if (y > -DOORHEIGHT) {
-					if (y >= FLOOR && y <= FLOOR +3 && side == door) {
-						// DIIEEEEEEE!!!
-						alive = 0;
-						splatter(side == LEFT ? SPLATTERPOS : -SPLATTERPOS, FLOOR - 45);
-					}
-				} else {
-					// Start new door
-					y = SCREEN_HEIGHT + DOORHEIGHT + 5;
-					door = (door == LEFT ? RIGHT : LEFT);
-				}
+			for(i = 0; i < 5; i++) {
+				doors_physics(&doors[i]);
 			}
-			for(i = 0; i < NPARTICLE; i++) {
-				if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
-					particle[i].x += particle[i].dx;
-					if(particle[i].x > WALLPOS * 8) {
-						particle[i].x -= particle[i].dx;
-						particle[i].dx *= -.1;
-						if(rand() % 3) {
-							particle[i].ddy = 0;
-							if(particle[i].dy < 0) particle[i].dy = 0;
-							particle[i].dx = 0;
-						}
-					}
-					if(particle[i].x < -WALLPOS * 8) {
-						particle[i].x -= particle[i].dx;
-						particle[i].dx *= -.1;
-						if(rand() % 3) {
-							particle[i].ddy = 0;
-							if(particle[i].dy < 0) particle[i].dy = 0;
-							particle[i].dx = 0;
-						}
-					}
-					particle[i].y += particle[i].dy;
-					particle[i].dy += particle[i].ddy;
-					if(particle[i].r && !(rand() % 5)) particle[i].r--;
-				}
+			for(i = 0; i < 4; i++) {
+				shaft_physics(&shaft[i], &doors[i], &doors[i + 1]);
 			}
+			add_doors();
 		}
 
 		while ( SDL_PollEvent(&event) ) {
@@ -221,24 +378,20 @@ int main(int argc, char *argv[])
 					break;
 				case SDL_KEYDOWN:
 					switch (event.key.keysym.sym) {
-						case SDLK_LEFT:
-							door = LEFT;
+						case SDLK_1:
+							flip(&shaft[0]);
 							break;
-						case SDLK_RIGHT:
-							door = RIGHT;
+						case SDLK_2:
+							flip(&shaft[1]);
+							break;
+						case SDLK_3:
+							flip(&shaft[2]);
+							break;
+						case SDLK_4:
+							flip(&shaft[3]);
 							break;
 						case SDLK_SPACE:
-							if (alive)
-								side = (side == LEFT ? RIGHT : LEFT);
-							break;
-						case SDLK_F1: /* new game */
-							if (!alive) {
-								alive = 1;
-								y = SCREEN_HEIGHT + DOORHEIGHT + 5;
-							}
-							break;
-						case SDLK_x:
-							splatter(-10, SCREEN_HEIGHT / 2);
+							newgame();
 							break;
 						case SDLK_ESCAPE:
 							running = 0;
@@ -248,42 +401,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		// Set background
-		glClearColor(.992, 1, .196, 0);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(
-			-SCREEN_WIDTH/2 * ((double) screen_width / screen_height) / ((double) SCREEN_WIDTH / SCREEN_HEIGHT),
-			SCREEN_WIDTH/2 * ((double) screen_width / screen_height) / ((double) SCREEN_WIDTH / SCREEN_HEIGHT),
-			SCREEN_HEIGHT,
-			0,
-			-1,
-			1);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-
-		glColor3d(.47, .47, .47);
-		fillrect(-82, 0, 82, 480);
-		glColor3d(1, 1, 1);
-		fillrect(-80, 0, 80, 480);
-		glColor3d(0, 0, 0);
-		fillrect(-WALLPOS-2, 0, -WALLPOS, 480);
-		fillrect(WALLPOS, 0, WALLPOS+2, 480);
-
-		for(i = 0; i < NPARTICLE; i++) {
-			if(particle[i].r > 0 && particle[i].y < (SCREEN_HEIGHT + CIRCLEMAX) * 8) {
-				draw_circle(particle[i].x / 8, particle[i].y / 8, particle[i].r);
-			}
-		}
-
-		glColor3d(1, 1, 1);
-		fillrect(-80, 0, -WALLPOS-2, 480);
-		fillrect(WALLPOS+2, 0, 80, 480);
-
-		draw_door(y, door);
-		draw_lift(side);
+		drawframe();
 
 		// Flip
 		SDL_GL_SwapBuffers();
