@@ -449,8 +449,10 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				glRotated(-angle, 0, 0, 1);
 				glColor3d(fade, fade, fade);
 				fillrect(-30, -52, 0, 0, 30);
+				fillrect(-34, -52, 0, -55, 30);
 				glColor3d(1, 1, 1);
 				fillrect(-28, -50, -2, -2, 30);
+				fillrect(-33, -53, -2, -54, 30);
 				glColor3d(fade, fade, fade);
 				draw_circle(-29, FLOOR-2, 4, 4, 30);
 			glPopMatrix();
