@@ -29,6 +29,7 @@ typedef enum {
 
 enum {
 	T_CIRCLE,
+	T_FONT,
 };
 
 struct particle {
@@ -136,7 +137,7 @@ static void load_font() {
 	SDL_RWops *fontdata = SDL_RWFromMem(&_binary_Allerta_allerta_medium_ttf_start, len);
 #endif
 
-	font =TTF_OpenFontRW(fontdata, 1, 52);
+	font =TTF_OpenFontRW(fontdata, 1, 14);
 }
 
 static int nextpoweroftwo(int x) {
@@ -144,12 +145,11 @@ static int nextpoweroftwo(int x) {
 	return round(pow(2,ceil(logbase2)));
 }
 
-static void render_text(char *text, TTF_Font *font, SDL_Color color, SDL_Rect *location) {
+static void render_text(char *text, TTF_Font *font, SDL_Color color, double x, double y) {
 	SDL_Surface *initial;
 	SDL_Surface *intermediary;
 	SDL_Rect rect;
 	int w,h;
-	int texture;
 
 	/* Use SDL_TTF to render our text */
 	initial = TTF_RenderText_Blended(font, text, color);
@@ -158,16 +158,18 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, SDL_Rect *l
 	w = nextpoweroftwo(initial->w);
 	h = nextpoweroftwo(initial->h);
 
+	printf("text h%d, w%d\n", h,w);
+
 	intermediary = SDL_CreateRGBSurface(0, w, h, 32, 
 			0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
 
 	SDL_BlitSurface(initial, 0, intermediary, 0);
 
 	/* Tell GL about our new texture */
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_BGRA, 
-			GL_UNSIGNED_BYTE, intermediary->pixels );
+	glBindTexture(GL_TEXTURE_2D, T_FONT);
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, intermediary->pixels);
+//	glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_BGRA, 
+//		GL_UNSIGNED_BYTE, intermediary->pixels );
 
 	/* GL_NEAREST looks horrible, if scaled... */
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -175,7 +177,7 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, SDL_Rect *l
 
 	/* prepare to render our texture */
 	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, texture);
+	glBindTexture(GL_TEXTURE_2D, T_FONT);
 	glColor3f(1.0f, 1.0f, 1.0f);
 
 	/* Draw a quad at location */
@@ -184,26 +186,22 @@ static void render_text(char *text, TTF_Font *font, SDL_Color color, SDL_Rect *l
 	 * 		   That is why the TexCoords specify different corners
 	 * 		   		   than the Vertex coors seem to. */
 	glTexCoord2f(0.0f, 1.0f); 
-	glVertex2f(location->x    , location->y);
+	glVertex2f(x, y);
 	glTexCoord2f(1.0f, 1.0f); 
-	glVertex2f(location->x + w, location->y);
+	glVertex2f(x + w, y);
 	glTexCoord2f(1.0f, 0.0f); 
-	glVertex2f(location->x + w, location->y + h);
+	glVertex2f(x + w, y + h);
 	glTexCoord2f(0.0f, 0.0f); 
-	glVertex2f(location->x    , location->y + h);
+	glVertex2f(x    , y + h);
 	glEnd();
 
 	/* Bad things happen if we delete the texture before it finishes */
 	glFinish();
 
-	/* return the deltas in the unused w,h part of the rect */
-	location->w = initial->w;
-	location->h = initial->h;
-
 	/* Clean up */
 	SDL_FreeSurface(initial);
 	SDL_FreeSurface(intermediary);
-	glDeleteTextures(1, &texture);
+	glDisable(GL_TEXTURE_2D);
 }
 
 
@@ -330,10 +328,9 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 }
 
 static void drawtitle() {
-	SDL_Rect pos = { 0.5, 0, 0.3, 0.5 };
 	SDL_Color blk = {0,0,0};
 
-	render_text("VARNING KLÄMRISK!", font, blk, &pos);
+	render_text("VARNING KLÄMRISK!", font, blk, -0.5, 0.5);
 }
 
 static void drawframe() {
