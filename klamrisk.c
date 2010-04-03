@@ -330,7 +330,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 static void drawtitle() {
 	SDL_Color blk = {0,0,0};
 
-	render_text("VARNING KLÄMRISK!", font, blk, -0.5, 0.5);
+	//render_text("VARNING KLÄMRISK!", font, blk, -0.5, 0.5);
 }
 
 static void drawframe() {
@@ -511,6 +511,8 @@ int main(int argc, char *argv[])
 	init_video(0); // SDL_FULLSCREEN;
 	precalc();
 	load_font();
+	if (!font)
+		return 1;
 	lasttick = SDL_GetTicks();
 	playing = 0;
 	while (running) {
