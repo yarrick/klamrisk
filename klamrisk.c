@@ -11,7 +11,7 @@
 #define OUTERPOS 80
 #define WALLPOS 30
 #define SPLATTERPOS 20
-#define DOORHEIGHT 100
+#define DOORHEIGHT 95
 #define FLOOR (0)		/* origo in middle of screen */
  
 #define CIRCLEMAX 32
@@ -96,7 +96,7 @@ static void cback(void *userdata, Uint8 *stream, int len) {
 	}
 }
 
-static int init_sdl(Uint32 flags) {
+static int init_sdl() {
 	int i;
 	SDL_Rect **modes;
 	SDL_AudioSpec spec = {
@@ -122,7 +122,8 @@ static int init_sdl(Uint32 flags) {
 		screen_height = modes[0]->h;
 	}
 
-	screen = SDL_SetVideoMode(screen_width, screen_height, 0, flags | SDL_HWSURFACE | SDL_OPENGL);
+	screen = SDL_SetVideoMode(screen_width, screen_height, 0, 
+		SDL_HWSURFACE | SDL_OPENGL | SDL_FULLSCREEN);
 	if (!screen) {
 		fprintf(stderr, "Unable to set video mode: %s\n", SDL_GetError());
 		return 0;
@@ -331,22 +332,19 @@ static void fillrect(double x1, double y1, double x2, double y2, double z) {
 	glEnd();
 }
 
-static void draw_circle(int xpos, int ypos, int r, double z) {
-	int x, y;
-
-	glColor3d(1, 0, 0);
+static void draw_circle(double xpos, double ypos, double wspan, double hspan, double z) {
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0, 0);
-	glVertex3d(xpos - r, ypos - r, z);
+	glVertex3d(xpos - wspan, ypos - hspan, z);
 	glTexCoord2d(0, 1);
-	glVertex3d(xpos - r, ypos + r, z);
+	glVertex3d(xpos - wspan, ypos + hspan, z);
 	glTexCoord2d(1, 1);
-	glVertex3d(xpos + r, ypos + r, z);
+	glVertex3d(xpos + wspan, ypos + hspan, z);
 	glTexCoord2d(1, 0);
-	glVertex3d(xpos + r, ypos - r, z);
+	glVertex3d(xpos + wspan, ypos - hspan, z);
 	glEnd();
 	glDisable(GL_BLEND);
 	glDisable(GL_TEXTURE_2D);
@@ -382,7 +380,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 	if(shaft->animframe > 10) {
 		offset = -speed * (shaft->animframe - 10);
 		if(shaft->animframe > 60) {
-			fade = (shaft->animframe - 60.0) / 40.0;
+			fade = (shaft->animframe - 60.0) / 30.0;
 			if(fade > 1) fade = 1;
 		}
 	} else {
@@ -419,7 +417,7 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				// Trash can
 				double y = FLOOR - 2;
 				y -= shaft->animframe * 0.8;
-				if (y < FLOOR-DOORHEIGHT+70) y = FLOOR-DOORHEIGHT + 70;
+				if (y < FLOOR-DOORHEIGHT+63) y = FLOOR-DOORHEIGHT + 63;
 				glTranslated(28, y, 0);
 				angle = shaft->animframe * 2;
 				if(angle > 33) angle = 33;
@@ -430,14 +428,33 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 				glColor3d(1, 1, 1);
 				fillrect(-28, -50, -2, -2, 30);
 			glPopMatrix();
+			glPushMatrix();
+				// Victim head
+				y = shaft->animframe * -0.8 + 5;
+				if (y < -27) y = -27;
+				if (y > 0) y = 0;
+				double skew = shaft->animframe * 0.6 - 15;
+				if (skew < 0) skew = 0;
+				if (skew > 2.6) skew = 2.6;
+				glTranslated(0, y, 0);
+				glColor3d(fade, fade, fade);
+				draw_circle(-19, -62, 9 + skew, 9 - skew, 30);
+				// Victim body
+				glTranslated(-3 * skew, skew, 0);
+				draw_circle(-19, -32, 9 - skew, 20 + skew, 30);
+				fillrect(-16, -15, -23, 0, 30);
+			glPopMatrix();
+
 		glPopMatrix();
 
 		// Draw the red lemonade
 		glDepthFunc(GL_LESS);
+		glColor3d(1, 0, 0);
 		if(shaft->direction == RIGHT) glScaled(-1, 1, 1);
 		for(i = 0; i < NPARTICLE; i++) {
 			if(shaft->particle[i].r > 0 && shaft->particle[i].y < (ymax + CIRCLEMAX) * 8) {
-				draw_circle(shaft->particle[i].x / 8, shaft->particle[i].y / 8, shaft->particle[i].r, 40 + i*.01);
+				draw_circle(shaft->particle[i].x / 8, shaft->particle[i].y / 8, 
+					shaft->particle[i].r, shaft->particle[i].r, 40 + i*.01);
 			}
 		}
 		glDepthFunc(GL_ALWAYS);
@@ -630,7 +647,7 @@ int main(int argc, char *argv[])
 	int running = 1;
 	Uint32 lasttick;
 
-	init_sdl(0); // SDL_FULLSCREEN;
+	init_sdl(0); // ;
 	precalc();
 	load_font();
 	if (!font)
@@ -674,7 +691,7 @@ int main(int argc, char *argv[])
 						case SDLK_SPACE:
 							newgame(4);
 							break;
-						case SDLK_F1:
+						case SDLK_T:
 							newgame(1);
 							break;
 						case SDLK_ESCAPE:
