@@ -9,7 +9,7 @@ klamrisk-win32.exe: klamrisk.c
 	i686-mingw32-strip $@
 
 klamrisk: klamrisk.c
-	$(CC) -o $@ $^ -lSDL -lGL -lGLU
+	$(CC) -std=c99 -o $@ $^ -lSDL -lGL -lGLU
 	strip $@
 
 clean:
