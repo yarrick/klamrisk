@@ -3,6 +3,7 @@
 #include <math.h>
 #include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
+#include <SDL/SDL_ttf.h>
 
 // These dimensions are in made-up units, where the width of an elevator shaft
 // is 60 pixels, and pixels are square.
@@ -61,6 +62,8 @@ struct shaft shaft[10];
 struct doors doors[10];
 
 int appearance_timer, rate, playing, speed;
+
+TTF_Font *font;
 
 #ifdef WIN32
 extern char binary_Allerta_allerta_medium_ttf_start;
@@ -121,6 +124,7 @@ static void precalc() {
 }
 
 static void load_font() {
+	TTF_Init();
 
 #ifdef WIN32
 	int len = (int) &binary_Allerta_allerta_medium_ttf_end;
