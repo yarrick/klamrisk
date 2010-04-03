@@ -54,10 +54,12 @@ int screen_width, screen_height;	// in actual pixels
 double ymax;				// in made-up units
 SDL_Surface *screen;
 
-struct shaft shaft[4];
-struct doors doors[5];
+int nbr_shafts;
+int nbr_doors;
+struct shaft shaft[10];
+struct doors doors[10];
 
-int appearance_timer, rate;
+int appearance_timer, rate, playing;
 
 // *************** Setup *************** 
 
@@ -203,12 +205,21 @@ static void draw_shaft(struct shaft *shaft, struct doors *left, struct doors *ri
 	glPopMatrix();
 }
 
+static void drawtitle() {
+	;
+}
+
 static void drawframe() {
 	int i;
 
 	// Set background
 	glClearColor(.992, 1, .196, 0);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	if (!playing) {
+		drawtitle();
+		return;
+	}
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -220,7 +231,7 @@ static void drawframe() {
 	//glColor3d(.47, .47, .47);
 	//fillrect(-82, 0, 82, 480);
 
-	for(i = 0; i < 4; i++) {
+	for(i = 0; i < nbr_shafts; i++) {
 		draw_shaft(&shaft[i], &doors[i], &doors[i + 1], 160 * (i - 2) + 80);
 	}
 }
@@ -291,7 +302,7 @@ static void resetshaft(struct shaft *shaft) {
 static void resetdoors(struct doors *d) {
 	int i;
 
-	for(i = 0; i < MAXDOOR; i++) {
+	for(i = 0; i < nbr_doors; i++) {
 		d->ypos[i] = -ymax;
 	}
 }
@@ -316,13 +327,20 @@ static void die(struct shaft *shaft) {
 	}
 }
 
-static void newgame() {
+static void newgame(int shafts) {
 	int i;
 
-	for(i = 0; i < 4; i++) {
+	if (shafts > 4)
+		return;
+
+	playing = 1;
+	nbr_doors = shafts+1;
+	nbr_shafts = shafts;
+	
+	for(i = 0; i < shafts; i++) {
 		resetshaft(&shaft[i]);
 	}
-	for(i = 0; i < 5; i++) {
+	for(i = 0; i < shafts + 1; i++) {
 		resetdoors(&doors[i]);
 	}
 	rate = 50;
@@ -356,9 +374,8 @@ int main(int argc, char *argv[])
 
 	init_video(0); // SDL_FULLSCREEN;
 	precalc();
-	newgame();
-
 	lasttick = SDL_GetTicks();
+	playing = 0;
 	while (running) {
 		SDL_Event event;
 		Uint32 now = SDL_GetTicks();
@@ -393,7 +410,10 @@ int main(int argc, char *argv[])
 							flip(&shaft[3]);
 							break;
 						case SDLK_SPACE:
-							newgame();
+							newgame(4);
+							break;
+						case SDLK_F1:
+							newgame(1);
 							break;
 						case SDLK_ESCAPE:
 							running = 0;
